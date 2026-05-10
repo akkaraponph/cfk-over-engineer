@@ -34,24 +34,22 @@ func (s *Service) CreateCategory(tenantID, name, description, catType string, is
 	id := uuid.New().String()
 	now := time.Now()
 
-	eventPayload := map[string]interface{}{
-		"id":          id,
-		"tenant_id":   tenantID,
-		"name":        name,
-		"description": description,
-		"type":        catType,
-		"is_custom":   isCustom,
-		"user_id":     userID,
-		"created_at":  now,
-		"updated_at":  now,
-	}
-
 	evt := event.Event{
 		AggregateType: "category",
 		AggregateID:   id,
 		EventType:     EventCreated,
 		Version:       1,
-		Payload:       eventPayload,
+		Payload: CategoryCreatedPayload{
+			ID:          id,
+			TenantID:    tenantID,
+			Name:        name,
+			Description: description,
+			Type:        catType,
+			IsCustom:    isCustom,
+			UserID:      userID,
+			CreatedAt:   now,
+			UpdatedAt:   now,
+		},
 		Metadata: map[string]interface{}{
 			"timestamp": now,
 		},
@@ -88,19 +86,17 @@ func (s *Service) UpdateCategory(id, name, description string) mo.Result[Categor
 
 	now := time.Now()
 
-	eventPayload := map[string]interface{}{
-		"id":          id,
-		"name":        name,
-		"description": description,
-		"updated_at":  now,
-	}
-
 	evt := event.Event{
 		AggregateType: "category",
 		AggregateID:   id,
 		EventType:     EventUpdated,
-		Version:       1,
-		Payload:       eventPayload,
+		Version:       cat.Version + 1,
+		Payload: CategoryUpdatedPayload{
+			ID:          id,
+			Name:        name,
+			Description: description,
+			UpdatedAt:   now,
+		},
 		Metadata: map[string]interface{}{
 			"timestamp": now,
 		},
@@ -125,17 +121,15 @@ func (s *Service) DeleteCategory(id string) mo.Result[Category] {
 
 	now := time.Now()
 
-	eventPayload := map[string]interface{}{
-		"id":         id,
-		"updated_at": now,
-	}
-
 	evt := event.Event{
 		AggregateType: "category",
 		AggregateID:   id,
 		EventType:     EventDeleted,
-		Version:       1,
-		Payload:       eventPayload,
+		Version:       cat.Version + 1,
+		Payload: CategoryDeletedPayload{
+			ID:        id,
+			UpdatedAt: now,
+		},
 		Metadata: map[string]interface{}{
 			"timestamp": now,
 		},

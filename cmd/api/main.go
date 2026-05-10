@@ -24,6 +24,9 @@ import (
 	"cfk/pkg/saga"
 	"context"
 	"log"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/gofiber/fiber/v3"
 )
@@ -51,7 +54,6 @@ func main() {
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	eventBus := event.NewBus(
 		event.WithWorkerPool(4),
@@ -188,44 +190,47 @@ func main() {
 	tenants := api.Group("/tenants")
 	tenants.Post("/", tenantHandler.CreateTenant)
 	tenants.Get("/:slug", tenantHandler.GetTenantBySlug)
-	tenants.Put("/:id/plan", tenantHandler.ChangePlan)
-	tenants.Post("/:id/activate", tenantHandler.ActivateTenant)
-	tenants.Post("/:id/deactivate", tenantHandler.DeactivateTenant)
-	tenants.Post("/:id/features", tenantHandler.EnableFeature)
-	tenants.Delete("/:id/features", tenantHandler.DisableFeature)
+	tenants.Put("/:id/plan", middleware.AuthMiddleware(), middleware.RequireRole("admin"), tenantHandler.ChangePlan)
+	tenants.Post("/:id/activate", middleware.AuthMiddleware(), middleware.RequireRole("admin"), tenantHandler.ActivateTenant)
+	tenants.Post("/:id/deactivate", middleware.AuthMiddleware(), middleware.RequireRole("admin"), tenantHandler.DeactivateTenant)
+	tenants.Post("/:id/features", middleware.AuthMiddleware(), middleware.RequireRole("admin"), tenantHandler.EnableFeature)
+	tenants.Delete("/:id/features", middleware.AuthMiddleware(), middleware.RequireRole("admin"), tenantHandler.DisableFeature)
 	tenants.Get("/:id/features", tenantHandler.CheckFeature)
 
 	tenantGroup := api.Group("/", middleware.TenantMiddleware(tenantService))
 
 	users := tenantGroup.Group("/users")
 	users.Post("/", userHandler.RegisterUser)
+	users.Post("/login", userHandler.Login)
 	users.Get("/email/:email", userHandler.GetUserByEmail)
 
-	pockets := tenantGroup.Group("/pockets")
+	authGroup := tenantGroup.Group("/", middleware.AuthMiddleware())
+
+	pockets := authGroup.Group("/pockets")
 	pockets.Post("/", pocketHandler.CreatePocket)
 	pockets.Get("/:id", pocketHandler.GetPocketByID)
 	pockets.Get("/user/:userId", pocketHandler.ListPocketsByUser)
 
-	cashflowins := tenantGroup.Group("/cashflowins")
+	cashflowins := authGroup.Group("/cashflowins")
 	cashflowins.Post("/", cashflowinHandler.RecordCashflowIn)
 	cashflowins.Get("/:id", cashflowinHandler.GetCashflowInByID)
 	cashflowins.Get("/pocket/:pocketId", cashflowinHandler.ListCashflowInsByPocket)
 
-	cashflowouts := tenantGroup.Group("/cashflowouts")
+	cashflowouts := authGroup.Group("/cashflowouts")
 	cashflowouts.Post("/", cashflowoutHandler.RecordCashflowOut)
 	cashflowouts.Get("/:id", cashflowoutHandler.GetCashflowOutByID)
 	cashflowouts.Get("/pocket/:pocketId", cashflowoutHandler.ListCashflowOutsByPocket)
 
-	transfers := tenantGroup.Group("/transfers", middleware.FeatureGuard(tenantService, "transfer"))
+	transfers := authGroup.Group("/transfers", middleware.FeatureGuard(tenantService, "transfer"))
 	transfers.Post("/", transferHandler.InitiateTransfer)
 	transfers.Get("/:id", transferHandler.GetTransferByID)
 
-	categories := tenantGroup.Group("/categories")
+	categories := authGroup.Group("/categories")
 	categories.Post("/", categoryHandler.CreateCategory)
 	categories.Get("/:id", categoryHandler.GetCategoryByID)
 	categories.Get("/", categoryHandler.ListCategoriesByTenant)
 
-	wealthGroup := tenantGroup.Group("/", middleware.FeatureGuard(tenantService, "balance_sheet"))
+	wealthGroup := authGroup.Group("/", middleware.FeatureGuard(tenantService, "balance_sheet"))
 
 	assets := wealthGroup.Group("/assets")
 	assets.Post("/", assetHandler.RecordAsset)
@@ -246,5 +251,25 @@ func main() {
 	balancesheets.Get("/:id", balancesheetHandler.GetBalanceSheetByID)
 	balancesheets.Put("/:id", balancesheetHandler.UpdateBalanceSheet)
 
-	log.Fatal(app.Listen(":3000"))
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		if err := app.Listen(":3000"); err != nil {
+			log.Printf("server stopped: %v", err)
+		}
+	}()
+
+	<-quit
+	log.Println("shutting down server...")
+
+	if err := app.Shutdown(); err != nil {
+		log.Printf("server shutdown error: %v", err)
+	}
+
+	log.Println("draining event bus...")
+	cancel()
+	eventBus.Stop()
+
+	log.Println("shutdown complete")
 }

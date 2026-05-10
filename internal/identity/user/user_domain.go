@@ -13,8 +13,14 @@ type User struct {
 	Email          string
 	Role           string
 	IsActive       bool
+	Version        int
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
+}
+
+type TokenResponse struct {
+	Token     string `json:"token"`
+	ExpiresAt int64  `json:"expires_at"`
 }
 
 const (

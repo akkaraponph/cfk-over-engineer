@@ -38,25 +38,23 @@ func (s *Service) RecordAsset(tenantID, assetType, description, userID string, v
 	id := uuid.New().String()
 	now := time.Now()
 
-	eventPayload := map[string]interface{}{
-		"id":                id,
-		"tenant_id":         tenantID,
-		"type":              assetType,
-		"description":       description,
-		"value":             value,
-		"cashflow_per_year": cashflowPerYear,
-		"balance_sheet_id":  "",
-		"user_id":           userID,
-		"created_at":        now,
-		"updated_at":        now,
-	}
-
 	evt := event.Event{
 		AggregateType: "asset",
 		AggregateID:   id,
 		EventType:     EventRecorded,
 		Version:       1,
-		Payload:       eventPayload,
+		Payload: AssetRecordedPayload{
+			ID:              id,
+			TenantID:        tenantID,
+			Type:            assetType,
+			Description:     description,
+			Value:           value,
+			CashflowPerYear: cashflowPerYear,
+			BalanceSheetID:  "",
+			UserID:          userID,
+			CreatedAt:       now,
+			UpdatedAt:       now,
+		},
 		Metadata: map[string]interface{}{
 			"timestamp": now,
 		},
@@ -93,19 +91,17 @@ func (s *Service) ChangeValue(id string, value, cashflowPerYear float64) mo.Resu
 
 	now := time.Now()
 
-	eventPayload := map[string]interface{}{
-		"id":                id,
-		"value":             value,
-		"cashflow_per_year": cashflowPerYear,
-		"updated_at":        now,
-	}
-
 	evt := event.Event{
 		AggregateType: "asset",
 		AggregateID:   id,
 		EventType:     EventValueChanged,
-		Version:       1,
-		Payload:       eventPayload,
+		Version:       asset.Version + 1,
+		Payload: AssetValueChangedPayload{
+			ID:              id,
+			Value:           value,
+			CashflowPerYear: cashflowPerYear,
+			UpdatedAt:       now,
+		},
 		Metadata: map[string]interface{}{
 			"timestamp": now,
 		},
@@ -130,18 +126,16 @@ func (s *Service) AssignToBalanceSheet(id, balanceSheetID string) mo.Result[Asse
 
 	now := time.Now()
 
-	eventPayload := map[string]interface{}{
-		"id":               id,
-		"balance_sheet_id": balanceSheetID,
-		"updated_at":       now,
-	}
-
 	evt := event.Event{
 		AggregateType: "asset",
 		AggregateID:   id,
 		EventType:     EventAssignedToBalanceSheet,
-		Version:       1,
-		Payload:       eventPayload,
+		Version:       asset.Version + 1,
+		Payload: AssetAssignedToBalanceSheetPayload{
+			ID:             id,
+			BalanceSheetID: balanceSheetID,
+			UpdatedAt:      now,
+		},
 		Metadata: map[string]interface{}{
 			"timestamp": now,
 		},
@@ -165,17 +159,15 @@ func (s *Service) UnassignFromBalanceSheet(id string) mo.Result[Asset] {
 
 	now := time.Now()
 
-	eventPayload := map[string]interface{}{
-		"id":         id,
-		"updated_at": now,
-	}
-
 	evt := event.Event{
 		AggregateType: "asset",
 		AggregateID:   id,
 		EventType:     EventUnassignedFromBalanceSheet,
-		Version:       1,
-		Payload:       eventPayload,
+		Version:       asset.Version + 1,
+		Payload: AssetUnassignedFromBalanceSheetPayload{
+			ID:        id,
+			UpdatedAt: now,
+		},
 		Metadata: map[string]interface{}{
 			"timestamp": now,
 		},

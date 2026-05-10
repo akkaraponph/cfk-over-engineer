@@ -34,21 +34,19 @@ func (s *Service) CreateBalanceSheet(tenantID, userID string, year int) mo.Resul
 	id := uuid.New().String()
 	now := time.Now()
 
-	eventPayload := map[string]interface{}{
-		"id":         id,
-		"tenant_id":  tenantID,
-		"user_id":    userID,
-		"year":       year,
-		"created_at": now,
-		"updated_at": now,
-	}
-
 	evt := event.Event{
 		AggregateType: "balancesheet",
 		AggregateID:   id,
 		EventType:     EventCreated,
 		Version:       1,
-		Payload:       eventPayload,
+		Payload: BalanceSheetCreatedPayload{
+			ID:        id,
+			TenantID:  tenantID,
+			UserID:    userID,
+			Year:      year,
+			CreatedAt: now,
+			UpdatedAt: now,
+		},
 		Metadata: map[string]interface{}{
 			"timestamp": now,
 		},
@@ -81,18 +79,16 @@ func (s *Service) UpdateBalanceSheet(id string, year int) mo.Result[BalanceSheet
 
 	now := time.Now()
 
-	eventPayload := map[string]interface{}{
-		"id":         id,
-		"year":       year,
-		"updated_at": now,
-	}
-
 	evt := event.Event{
 		AggregateType: "balancesheet",
 		AggregateID:   id,
 		EventType:     EventUpdated,
-		Version:       1,
-		Payload:       eventPayload,
+		Version:       bs.Version + 1,
+		Payload: BalanceSheetUpdatedPayload{
+			ID:        id,
+			Year:      year,
+			UpdatedAt: now,
+		},
 		Metadata: map[string]interface{}{
 			"timestamp": now,
 		},

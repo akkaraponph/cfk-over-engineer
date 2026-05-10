@@ -1,6 +1,7 @@
 package user
 
 import (
+	"cfk/pkg/auth"
 	"cfk/pkg/event"
 	"errors"
 	"time"
@@ -17,6 +18,8 @@ var (
 	ErrInvalidRole        = errors.New("invalid role")
 	ErrNotFound           = errors.New("user not found")
 	ErrEmailAlreadyExists = errors.New("email already exists")
+	ErrInvalidCredentials = errors.New("invalid email or password")
+	ErrUserDeactivated    = errors.New("user account is deactivated")
 )
 
 var validRoles = map[string]bool{
@@ -200,6 +203,32 @@ func (s *Service) GetUserByEmail(tenantID, email string) mo.Result[User] {
 		return mo.Err[User](ErrNotFound)
 	}
 	return mo.Ok(user)
+}
+
+func (s *Service) Login(tenantID, email, password string) mo.Result[TokenResponse] {
+	userOpt := s.repo.FindByEmail(tenantID, email)
+	user, ok := userOpt.Get()
+	if !ok {
+		return mo.Err[TokenResponse](ErrInvalidCredentials)
+	}
+
+	if !user.IsActive {
+		return mo.Err[TokenResponse](ErrUserDeactivated)
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(user.HashedPassword), []byte(password)); err != nil {
+		return mo.Err[TokenResponse](ErrInvalidCredentials)
+	}
+
+	token, err := auth.GenerateToken(user.ID, user.TenantID, user.Role, user.Email)
+	if err != nil {
+		return mo.Err[TokenResponse](err)
+	}
+
+	return mo.Ok(TokenResponse{
+		Token:     token,
+		ExpiresAt: time.Now().Add(24 * time.Hour).Unix(),
+	})
 }
 
 func (s *Service) updateUserStatus(id string, isActive bool, eventType string) mo.Result[User] {

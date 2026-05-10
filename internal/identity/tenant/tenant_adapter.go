@@ -13,6 +13,7 @@ type TenantProjection struct {
 	Slug      string    `gorm:"size:255;uniqueIndex;not null"`
 	Plan      string    `gorm:"size:50;not null;default:'free'"`
 	IsActive  bool      `gorm:"not null;default:true"`
+	Version   int       `gorm:"not null;default:1"`
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }
@@ -60,6 +61,7 @@ func toDomain(p TenantProjection) Tenant {
 		Slug:      p.Slug,
 		Plan:      Plan(p.Plan),
 		IsActive:  p.IsActive,
+		Version:   p.Version,
 		CreatedAt: p.CreatedAt,
 		UpdatedAt: p.UpdatedAt,
 	}

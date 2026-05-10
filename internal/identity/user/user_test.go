@@ -4,6 +4,7 @@ import (
 	"cfk/pkg/event"
 	"context"
 	"errors"
+	"os"
 	"testing"
 	"time"
 
@@ -22,7 +23,7 @@ func newMockUserRepo() *mockUserRepo {
 	}
 }
 
-func (r *mockUserRepo) AppendEvent(eventType string, aggregateID string, payload map[string]interface{}, metadata map[string]interface{}) error {
+func (r *mockUserRepo) AppendEvent(eventType string, aggregateID string, payload any, metadata map[string]interface{}) error {
 	return nil
 }
 
@@ -438,5 +439,77 @@ func TestUpdateProfile_NotFound(t *testing.T) {
 	_, err := svc.UpdateProfile("nonexistent", "New", "Name", "0812345678").Get()
 	if !errors.Is(err, ErrNotFound) {
 		t.Errorf("expected ErrNotFound, got %v", err)
+	}
+}
+
+func TestLogin_Valid(t *testing.T) {
+	os.Setenv("JWT_SECRET", "test-secret-key")
+	defer os.Unsetenv("JWT_SECRET")
+
+	repo := newMockUserRepo()
+	bus, _ := setupTestBus(t)
+	svc := NewService(repo, bus)
+
+	registered, _ := svc.RegisterUser("t-1", "testuser", "login@example.com", "password123", "F", "L", "", "user").Get()
+	repo.users[registered.ID] = registered
+	repo.byEmail["t-1:login@example.com"] = registered
+
+	tokenResp, err := svc.Login("t-1", "login@example.com", "password123").Get()
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if tokenResp.Token == "" {
+		t.Error("expected non-empty token")
+	}
+	if tokenResp.ExpiresAt == 0 {
+		t.Error("expected non-zero expires_at")
+	}
+}
+
+func TestLogin_WrongPassword(t *testing.T) {
+	repo := newMockUserRepo()
+	bus, _ := setupTestBus(t)
+	svc := NewService(repo, bus)
+
+	registered, _ := svc.RegisterUser("t-1", "testuser", "login2@example.com", "password123", "F", "L", "", "user").Get()
+	repo.users[registered.ID] = registered
+	repo.byEmail["t-1:login2@example.com"] = registered
+
+	_, err := svc.Login("t-1", "login2@example.com", "wrongpassword").Get()
+	if !errors.Is(err, ErrInvalidCredentials) {
+		t.Errorf("expected ErrInvalidCredentials, got %v", err)
+	}
+}
+
+func TestLogin_UserNotFound(t *testing.T) {
+	repo := newMockUserRepo()
+	bus, _ := setupTestBus(t)
+	svc := NewService(repo, bus)
+
+	_, err := svc.Login("t-1", "nonexistent@example.com", "password123").Get()
+	if !errors.Is(err, ErrInvalidCredentials) {
+		t.Errorf("expected ErrInvalidCredentials, got %v", err)
+	}
+}
+
+func TestLogin_DeactivatedUser(t *testing.T) {
+	repo := newMockUserRepo()
+	bus, _ := setupTestBus(t)
+	svc := NewService(repo, bus)
+
+	existing := User{
+		ID:             "u-1",
+		TenantID:       "t-1",
+		Email:          "deactivated@example.com",
+		Role:           "user",
+		IsActive:       false,
+		HashedPassword: "$2a$10$dummy",
+	}
+	repo.users["u-1"] = existing
+	repo.byEmail["t-1:deactivated@example.com"] = existing
+
+	_, err := svc.Login("t-1", "deactivated@example.com", "password123").Get()
+	if !errors.Is(err, ErrUserDeactivated) {
+		t.Errorf("expected ErrUserDeactivated, got %v", err)
 	}
 }

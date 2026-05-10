@@ -4,6 +4,7 @@ import (
 	"cfk/pkg/database"
 	"cfk/pkg/event"
 	"encoding/json"
+	"fmt"
 
 	"github.com/samber/mo"
 	"gorm.io/gorm"
@@ -25,8 +26,13 @@ func (h *ProjectionHandler) Handle(evt event.Event) mo.Result[struct{}] {
 		Version:       evt.Version,
 	}
 
-	payloadJSON, _ := json.Marshal(evt.Payload)
-	eventStore.Payload = string(payloadJSON)
+	if evt.Payload != nil {
+		payloadJSON, err := json.Marshal(evt.Payload)
+		if err != nil {
+			return mo.Err[struct{}](fmt.Errorf("marshal payload: %w", err))
+		}
+		eventStore.Payload = string(payloadJSON)
+	}
 
 	if evt.Metadata != nil {
 		metadataJSON, _ := json.Marshal(evt.Metadata)

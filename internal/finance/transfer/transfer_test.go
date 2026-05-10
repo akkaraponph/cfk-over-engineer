@@ -20,7 +20,7 @@ func newMockTransferRepo() *mockTransferRepo {
 	}
 }
 
-func (r *mockTransferRepo) AppendEvent(eventType string, aggregateID string, payload map[string]interface{}, metadata map[string]interface{}) error {
+func (r *mockTransferRepo) AppendEvent(eventType string, aggregateID string, payload any, metadata map[string]interface{}) error {
 	return nil
 }
 

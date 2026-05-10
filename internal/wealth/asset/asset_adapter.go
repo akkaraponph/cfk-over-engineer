@@ -18,6 +18,7 @@ type AssetProjection struct {
 	CashflowPerYear float64 `gorm:"type:decimal(15,2);not null;default:0"`
 	BalanceSheetID  string  `gorm:"type:uuid;index"`
 	UserID          string  `gorm:"type:uuid;index"`
+	Version         int     `gorm:"not null;default:1"`
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
 }
@@ -35,7 +36,7 @@ func NewGORMRepository(db *gorm.DB) *GORMRepository {
 	return &GORMRepository{db: db, aggregateType: "asset"}
 }
 
-func (r *GORMRepository) AppendEvent(eventType string, aggregateID string, payload map[string]interface{}, metadata map[string]interface{}) error {
+func (r *GORMRepository) AppendEvent(eventType string, aggregateID string, payload any, metadata map[string]interface{}) error {
 	payloadJSON, _ := json.Marshal(payload)
 	es := database.EventStore{
 		AggregateType: r.aggregateType,
@@ -69,6 +70,7 @@ func toDomain(p AssetProjection) Asset {
 		CashflowPerYear: p.CashflowPerYear,
 		BalanceSheetID:  p.BalanceSheetID,
 		UserID:          p.UserID,
+		Version:         p.Version,
 		CreatedAt:       p.CreatedAt,
 		UpdatedAt:       p.UpdatedAt,
 	}

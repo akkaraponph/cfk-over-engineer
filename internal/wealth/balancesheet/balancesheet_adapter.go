@@ -14,6 +14,7 @@ type BalanceSheetProjection struct {
 	TenantID  string `gorm:"type:uuid;not null;index"`
 	UserID    string `gorm:"type:uuid;index"`
 	Year      int    `gorm:"not null"`
+	Version   int    `gorm:"not null;default:1"`
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }
@@ -31,7 +32,7 @@ func NewGORMRepository(db *gorm.DB) *GORMRepository {
 	return &GORMRepository{db: db, aggregateType: "balancesheet"}
 }
 
-func (r *GORMRepository) AppendEvent(eventType string, aggregateID string, payload map[string]interface{}, metadata map[string]interface{}) error {
+func (r *GORMRepository) AppendEvent(eventType string, aggregateID string, payload any, metadata map[string]interface{}) error {
 	payloadJSON, _ := json.Marshal(payload)
 	es := database.EventStore{
 		AggregateType: r.aggregateType,
@@ -61,6 +62,7 @@ func toDomain(p BalanceSheetProjection) BalanceSheet {
 		TenantID:  p.TenantID,
 		UserID:    p.UserID,
 		Year:      p.Year,
+		Version:   p.Version,
 		CreatedAt: p.CreatedAt,
 		UpdatedAt: p.UpdatedAt,
 	}

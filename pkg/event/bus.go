@@ -2,6 +2,8 @@ package event
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"sync"
 	"time"
 
@@ -13,8 +15,21 @@ type Event struct {
 	AggregateID   string
 	EventType     string
 	Version       int
-	Payload       map[string]interface{}
+	Payload       any
 	Metadata      map[string]interface{}
+}
+
+func DecodePayload[T any](evt Event) (T, error) {
+	var zero T
+	b, err := json.Marshal(evt.Payload)
+	if err != nil {
+		return zero, fmt.Errorf("marshal payload: %w", err)
+	}
+	var target T
+	if err := json.Unmarshal(b, &target); err != nil {
+		return zero, fmt.Errorf("unmarshal payload: %w", err)
+	}
+	return target, nil
 }
 
 type Handler func(Event) mo.Result[struct{}]

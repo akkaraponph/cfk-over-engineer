@@ -41,25 +41,23 @@ func (s *Service) RecordCashflowIn(tenantID, userID, pocketID string, categoryID
 	id := uuid.New().String()
 	now := time.Now()
 
-	eventPayload := map[string]interface{}{
-		"id":          id,
-		"tenant_id":   tenantID,
-		"user_id":     userID,
-		"pocket_id":   pocketID,
-		"category_id": categoryID,
-		"amount":      amount,
-		"description": description,
-		"receipt":     receipt,
-		"created_at":  now,
-		"updated_at":  now,
-	}
-
 	evt := event.Event{
 		AggregateType: "cashflowin",
 		AggregateID:   id,
 		EventType:     EventRecorded,
 		Version:       1,
-		Payload:       eventPayload,
+		Payload: CashflowInRecordedPayload{
+			ID:          id,
+			TenantID:    tenantID,
+			UserID:      userID,
+			PocketID:    pocketID,
+			CategoryID:  categoryID,
+			Amount:      amount,
+			Description: description,
+			Receipt:     receipt,
+			CreatedAt:   now,
+			UpdatedAt:   now,
+		},
 		Metadata: map[string]interface{}{
 			"timestamp": now,
 		},
@@ -105,21 +103,20 @@ func (s *Service) UpdateCashflowIn(id string, amount float64, description string
 	}
 
 	now := time.Now()
-	eventPayload := map[string]interface{}{
-		"id":          id,
-		"amount":      amount,
-		"description": description,
-		"category_id": categoryID,
-		"receipt":     receipt,
-		"updated_at":  now,
-	}
 
 	evt := event.Event{
 		AggregateType: "cashflowin",
 		AggregateID:   id,
 		EventType:     EventUpdated,
-		Version:       1,
-		Payload:       eventPayload,
+		Version:       cf.Version + 1,
+		Payload: CashflowInUpdatedPayload{
+			ID:          id,
+			Amount:      amount,
+			Description: description,
+			CategoryID:  categoryID,
+			Receipt:     receipt,
+			UpdatedAt:   now,
+		},
 		Metadata: map[string]interface{}{
 			"timestamp": now,
 		},
@@ -145,17 +142,16 @@ func (s *Service) DeleteCashflowIn(id string) mo.Result[CashflowIn] {
 	}
 
 	now := time.Now()
-	eventPayload := map[string]interface{}{
-		"id":         id,
-		"updated_at": now,
-	}
 
 	evt := event.Event{
 		AggregateType: "cashflowin",
 		AggregateID:   id,
 		EventType:     EventDeleted,
-		Version:       1,
-		Payload:       eventPayload,
+		Version:       cf.Version + 1,
+		Payload: CashflowInDeletedPayload{
+			ID:        id,
+			UpdatedAt: now,
+		},
 		Metadata: map[string]interface{}{
 			"timestamp": now,
 		},

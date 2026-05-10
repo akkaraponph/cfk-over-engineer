@@ -46,24 +46,22 @@ func (s *Service) InitiateTransfer(tenantID, userID, fromPocketID, toPocketID st
 	id := uuid.New().String()
 	now := time.Now()
 
-	eventPayload := map[string]interface{}{
-		"id":             id,
-		"tenant_id":      tenantID,
-		"user_id":        userID,
-		"from_pocket_id": fromPocketID,
-		"to_pocket_id":   toPocketID,
-		"amount":         amount,
-		"status":         "pending",
-		"created_at":     now,
-		"updated_at":     now,
-	}
-
 	evt := event.Event{
 		AggregateType: "transfer",
 		AggregateID:   id,
 		EventType:     EventInitiated,
 		Version:       1,
-		Payload:       eventPayload,
+		Payload: TransferInitiatedPayload{
+			ID:           id,
+			TenantID:     tenantID,
+			UserID:       userID,
+			FromPocketID: fromPocketID,
+			ToPocketID:   toPocketID,
+			Amount:       amount,
+			Status:       "pending",
+			CreatedAt:    now,
+			UpdatedAt:    now,
+		},
 		Metadata: map[string]interface{}{
 			"timestamp": now,
 		},
@@ -109,18 +107,16 @@ func (s *Service) CompleteTransfer(id string) mo.Result[Transfer] {
 
 	now := time.Now()
 
-	eventPayload := map[string]interface{}{
-		"id":         id,
-		"status":     "completed",
-		"updated_at": now,
-	}
-
 	evt := event.Event{
 		AggregateType: "transfer",
 		AggregateID:   id,
 		EventType:     EventCompleted,
-		Version:       1,
-		Payload:       eventPayload,
+		Version:       t.Version + 1,
+		Payload: TransferCompletedPayload{
+			ID:        id,
+			Status:    "completed",
+			UpdatedAt: now,
+		},
 		Metadata: map[string]interface{}{
 			"timestamp": now,
 		},
@@ -147,19 +143,17 @@ func (s *Service) FailTransfer(id string, reason string) mo.Result[Transfer] {
 
 	now := time.Now()
 
-	eventPayload := map[string]interface{}{
-		"id":         id,
-		"status":     "failed",
-		"reason":     reason,
-		"updated_at": now,
-	}
-
 	evt := event.Event{
 		AggregateType: "transfer",
 		AggregateID:   id,
 		EventType:     EventFailed,
-		Version:       1,
-		Payload:       eventPayload,
+		Version:       t.Version + 1,
+		Payload: TransferFailedPayload{
+			ID:        id,
+			Status:    "failed",
+			Reason:    reason,
+			UpdatedAt: now,
+		},
 		Metadata: map[string]interface{}{
 			"timestamp": now,
 		},
@@ -182,17 +176,16 @@ func (s *Service) DeleteTransfer(id string) mo.Result[Transfer] {
 	}
 
 	now := time.Now()
-	eventPayload := map[string]interface{}{
-		"id":         id,
-		"updated_at": now,
-	}
 
 	evt := event.Event{
 		AggregateType: "transfer",
 		AggregateID:   id,
 		EventType:     EventDeleted,
-		Version:       1,
-		Payload:       eventPayload,
+		Version:       t.Version + 1,
+		Payload: TransferDeletedPayload{
+			ID:        id,
+			UpdatedAt: now,
+		},
 		Metadata: map[string]interface{}{
 			"timestamp": now,
 		},

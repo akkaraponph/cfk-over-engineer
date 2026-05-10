@@ -8,21 +8,22 @@ import (
 )
 
 type RequestLogProjection struct {
-	ID             string `gorm:"type:uuid;primaryKey"`
-	TenantID       string `gorm:"type:uuid;index"`
-	UserID         string `gorm:"type:uuid;index"`
-	Method         string `gorm:"size:10;not null"`
-	Path           string `gorm:"size:500;not null"`
-	QueryParams    string `gorm:"type:jsonb"`
-	RequestHeaders string `gorm:"type:jsonb"`
-	RequestBody    string `gorm:"type:jsonb"`
-	ResponseStatus int    `gorm:"index"`
-	ResponseBody   string `gorm:"type:jsonb"`
+	ID             string    `gorm:"type:uuid;primaryKey"`
+	TenantID       string    `gorm:"type:uuid;index"`
+	UserID         string    `gorm:"type:uuid;index"`
+	Method         string    `gorm:"size:10;not null"`
+	Path           string    `gorm:"size:500;not null"`
+	QueryParams    string    `gorm:"type:jsonb"`
+	RequestHeaders string    `gorm:"type:jsonb"`
+	RequestBody    string    `gorm:"type:jsonb"`
+	ResponseStatus int       `gorm:"index"`
+	ResponseBody   string    `gorm:"type:jsonb"`
 	ResponseTimeMs int
-	IPAddress      string `gorm:"size:45"`
-	UserAgent      string `gorm:"type:text"`
-	ErrorMessage   string `gorm:"type:text"`
-	ErrorStack     string `gorm:"type:text"`
+	IPAddress      string    `gorm:"size:45"`
+	UserAgent      string    `gorm:"type:text"`
+	ErrorMessage   string    `gorm:"type:text"`
+	ErrorStack     string    `gorm:"type:text"`
+	Version        int       `gorm:"not null;default:1"`
 	CreatedAt      time.Time `gorm:"not null;index"`
 }
 
@@ -81,6 +82,7 @@ func toDomain(p RequestLogProjection) RequestLog {
 		UserAgent:      p.UserAgent,
 		ErrorMessage:   p.ErrorMessage,
 		ErrorStack:     p.ErrorStack,
+		Version:        p.Version,
 		CreatedAt:      p.CreatedAt,
 	}
 }

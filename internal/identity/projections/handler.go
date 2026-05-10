@@ -2,6 +2,7 @@ package projections
 
 import (
 	"cfk/pkg/event"
+	"encoding/json"
 
 	"github.com/samber/mo"
 	"gorm.io/gorm"
@@ -145,7 +146,15 @@ func (h *IdentityProjectionHandler) HandleUser(evt event.Event) mo.Result[struct
 	return event.OkHandle()
 }
 
-func payloadStr(m map[string]interface{}, key string) string {
+func toMap(payload any) map[string]interface{} {
+	b, _ := json.Marshal(payload)
+	m := make(map[string]interface{})
+	json.Unmarshal(b, &m)
+	return m
+}
+
+func payloadStr(payload any, key string) string {
+	m := toMap(payload)
 	if v, ok := m[key]; ok {
 		if s, ok := v.(string); ok {
 			return s
@@ -154,7 +163,8 @@ func payloadStr(m map[string]interface{}, key string) string {
 	return ""
 }
 
-func payloadBool(m map[string]interface{}, key string) bool {
+func payloadBool(payload any, key string) bool {
+	m := toMap(payload)
 	if v, ok := m[key]; ok {
 		if b, ok := v.(bool); ok {
 			return b
@@ -163,7 +173,8 @@ func payloadBool(m map[string]interface{}, key string) bool {
 	return false
 }
 
-func payloadTime(m map[string]interface{}, key string) interface{} {
+func payloadTime(payload any, key string) interface{} {
+	m := toMap(payload)
 	if v, ok := m[key]; ok {
 		return v
 	}

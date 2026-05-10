@@ -44,6 +44,23 @@ func (h *Handler) GetUserByEmail(c fiber.Ctx) error {
 	return c.JSON(user)
 }
 
+func (h *Handler) Login(c fiber.Ctx) error {
+	var req struct {
+		TenantID string `json:"tenant_id"`
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+	if err := c.Bind().JSON(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	tokenResp, err := h.service.Login(req.TenantID, req.Email, req.Password).Get()
+	if err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(tokenResp)
+}
+
 func (h *Handler) ActivateUser(c fiber.Ctx) error {
 	id := c.Params("id")
 	user, err := h.service.ActivateUser(id).Get()

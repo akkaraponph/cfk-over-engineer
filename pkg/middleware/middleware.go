@@ -2,7 +2,10 @@ package middleware
 
 import (
 	"cfk/internal/identity/tenant"
+	"cfk/pkg/auth"
+	"log"
 	"strings"
+	"time"
 
 	"github.com/gofiber/fiber/v3"
 )
@@ -65,14 +68,65 @@ func AuthMiddleware() fiber.Handler {
 			})
 		}
 		token := strings.TrimPrefix(authHeader, "Bearer ")
-		c.Locals("token", token)
+
+		claims, err := auth.ValidateToken(token)
+		if err != nil {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"error": "invalid or expired token",
+			})
+		}
+
+		c.Locals("user_id", claims.UserID)
+		c.Locals("tenant_id", claims.TenantID)
+		c.Locals("user_role", claims.Role)
+		c.Locals("user_email", claims.Email)
 		return c.Next()
+	}
+}
+
+func RequireRole(roles ...string) fiber.Handler {
+	return func(c fiber.Ctx) error {
+		userRole, ok := c.Locals("user_role").(string)
+		if !ok || userRole == "" {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+				"error": "access denied",
+			})
+		}
+		for _, r := range roles {
+			if userRole == r {
+				return c.Next()
+			}
+		}
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+			"error": "insufficient permissions",
+		})
 	}
 }
 
 func RequestLoggerMiddleware() fiber.Handler {
 	return func(c fiber.Ctx) error {
+		start := time.Now()
 		err := c.Next()
+		duration := time.Since(start)
+
+		tenantID := c.Locals("tenant_id")
+		userID := c.Locals("user_id")
+
+		status := c.Response().StatusCode()
+		method := c.Method()
+		path := c.Path()
+
+		log.Printf("[%s] %s %s %d %s tenant=%v user=%v ip=%s",
+			start.Format(time.RFC3339),
+			method,
+			path,
+			status,
+			duration.Round(time.Millisecond),
+			tenantID,
+			userID,
+			c.IP(),
+		)
+
 		return err
 	}
 }

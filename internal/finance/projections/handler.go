@@ -2,6 +2,7 @@ package projections
 
 import (
 	"cfk/pkg/event"
+	"encoding/json"
 
 	"github.com/samber/mo"
 	"gorm.io/gorm"
@@ -18,46 +19,81 @@ func NewFinanceProjectionHandler(db *gorm.DB) *FinanceProjectionHandler {
 func (h *FinanceProjectionHandler) HandlePocket(evt event.Event) mo.Result[struct{}] {
 	switch evt.EventType {
 	case "pocket.created":
+		var p struct {
+			TenantID  string  `json:"tenant_id"`
+			Name      string  `json:"name"`
+			Balance   float64 `json:"balance"`
+			UserID    string  `json:"user_id"`
+			CreatedAt any     `json:"created_at"`
+			UpdatedAt any     `json:"updated_at"`
+		}
+		if err := decodePayload(evt, &p); err != nil {
+			return mo.Err[struct{}](err)
+		}
 		proj := map[string]interface{}{
 			"id":         evt.AggregateID,
-			"tenant_id":  payloadStr(evt.Payload, "tenant_id"),
-			"name":       payloadStr(evt.Payload, "name"),
-			"balance":    payloadFloat(evt.Payload, "balance"),
-			"user_id":    payloadStr(evt.Payload, "user_id"),
+			"tenant_id":  p.TenantID,
+			"name":       p.Name,
+			"balance":    p.Balance,
+			"user_id":    p.UserID,
 			"is_deleted": false,
-			"created_at": payloadTime(evt.Payload, "created_at"),
-			"updated_at": payloadTime(evt.Payload, "updated_at"),
+			"version":    evt.Version,
+			"created_at": p.CreatedAt,
+			"updated_at": p.UpdatedAt,
 		}
 		if err := h.db.Table("pocket_projections").Create(proj).Error; err != nil {
 			return mo.Err[struct{}](err)
 		}
 		return event.OkHandle()
 	case "pocket.name_changed":
+		var p struct {
+			Name      string `json:"name"`
+			UpdatedAt any    `json:"updated_at"`
+		}
+		if err := decodePayload(evt, &p); err != nil {
+			return mo.Err[struct{}](err)
+		}
 		if err := h.db.Table("pocket_projections").
 			Where("id = ?", evt.AggregateID).
 			Updates(map[string]interface{}{
-				"name":       payloadStr(evt.Payload, "name"),
-				"updated_at": payloadTime(evt.Payload, "updated_at"),
+				"name":       p.Name,
+				"version":    evt.Version,
+				"updated_at": p.UpdatedAt,
 			}).Error; err != nil {
 			return mo.Err[struct{}](err)
 		}
 		return event.OkHandle()
 	case "pocket.balance_changed":
+		var p struct {
+			NewBalance float64 `json:"new_balance"`
+			UpdatedAt  any     `json:"updated_at"`
+		}
+		if err := decodePayload(evt, &p); err != nil {
+			return mo.Err[struct{}](err)
+		}
 		if err := h.db.Table("pocket_projections").
 			Where("id = ?", evt.AggregateID).
 			Updates(map[string]interface{}{
-				"balance":    payloadFloat(evt.Payload, "new_balance"),
-				"updated_at": payloadTime(evt.Payload, "updated_at"),
+				"balance":    p.NewBalance,
+				"version":    evt.Version,
+				"updated_at": p.UpdatedAt,
 			}).Error; err != nil {
 			return mo.Err[struct{}](err)
 		}
 		return event.OkHandle()
 	case "pocket.deleted":
+		var p struct {
+			UpdatedAt any `json:"updated_at"`
+		}
+		if err := decodePayload(evt, &p); err != nil {
+			return mo.Err[struct{}](err)
+		}
 		if err := h.db.Table("pocket_projections").
 			Where("id = ?", evt.AggregateID).
 			Updates(map[string]interface{}{
 				"is_deleted": true,
-				"updated_at": payloadTime(evt.Payload, "updated_at"),
+				"version":    evt.Version,
+				"updated_at": p.UpdatedAt,
 			}).Error; err != nil {
 			return mo.Err[struct{}](err)
 		}
@@ -248,7 +284,23 @@ func (h *FinanceProjectionHandler) HandleCategory(evt event.Event) mo.Result[str
 	return event.OkHandle()
 }
 
-func payloadStr(m map[string]interface{}, key string) string {
+func decodePayload(evt event.Event, target interface{}) error {
+	b, err := json.Marshal(evt.Payload)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(b, target)
+}
+
+func toMap(payload any) map[string]interface{} {
+	b, _ := json.Marshal(payload)
+	m := make(map[string]interface{})
+	json.Unmarshal(b, &m)
+	return m
+}
+
+func payloadStr(payload any, key string) string {
+	m := toMap(payload)
 	if v, ok := m[key]; ok {
 		if s, ok := v.(string); ok {
 			return s
@@ -257,7 +309,8 @@ func payloadStr(m map[string]interface{}, key string) string {
 	return ""
 }
 
-func payloadBool(m map[string]interface{}, key string) bool {
+func payloadBool(payload any, key string) bool {
+	m := toMap(payload)
 	if v, ok := m[key]; ok {
 		if b, ok := v.(bool); ok {
 			return b
@@ -266,7 +319,8 @@ func payloadBool(m map[string]interface{}, key string) bool {
 	return false
 }
 
-func payloadFloat(m map[string]interface{}, key string) float64 {
+func payloadFloat(payload any, key string) float64 {
+	m := toMap(payload)
 	if v, ok := m[key]; ok {
 		switch val := v.(type) {
 		case float64:
@@ -280,7 +334,8 @@ func payloadFloat(m map[string]interface{}, key string) float64 {
 	return 0
 }
 
-func payloadInt(m map[string]interface{}, key string) int {
+func payloadInt(payload any, key string) int {
+	m := toMap(payload)
 	if v, ok := m[key]; ok {
 		switch val := v.(type) {
 		case float64:
@@ -294,7 +349,8 @@ func payloadInt(m map[string]interface{}, key string) int {
 	return 0
 }
 
-func payloadTime(m map[string]interface{}, key string) interface{} {
+func payloadTime(payload any, key string) interface{} {
+	m := toMap(payload)
 	if v, ok := m[key]; ok {
 		return v
 	}

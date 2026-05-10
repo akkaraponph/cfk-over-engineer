@@ -10,12 +10,13 @@ import (
 )
 
 type PocketProjection struct {
-	ID        string  `gorm:"type:uuid;primaryKey"`
-	TenantID  string  `gorm:"type:uuid;not null;index"`
-	Name      string  `gorm:"size:255;not null"`
-	Balance   float64 `gorm:"type:decimal(15,2);not null;default:0"`
-	UserID    string  `gorm:"type:uuid;index"`
-	IsDeleted bool    `gorm:"not null;default:false"`
+	ID        string    `gorm:"type:uuid;primaryKey"`
+	TenantID  string    `gorm:"type:uuid;not null;index"`
+	Name      string    `gorm:"size:255;not null"`
+	Balance   float64   `gorm:"type:decimal(15,2);not null;default:0"`
+	UserID    string    `gorm:"type:uuid;index"`
+	Version   int       `gorm:"not null;default:1"`
+	IsDeleted bool      `gorm:"not null;default:false"`
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }
@@ -33,7 +34,7 @@ func NewGORMRepository(db *gorm.DB) *GORMRepository {
 	return &GORMRepository{db: db, aggregateType: "pocket"}
 }
 
-func (r *GORMRepository) AppendEvent(eventType string, aggregateID string, payload map[string]interface{}, metadata map[string]interface{}) error {
+func (r *GORMRepository) AppendEvent(eventType string, aggregateID string, payload any, metadata map[string]interface{}) error {
 	payloadJSON, _ := json.Marshal(payload)
 	es := database.EventStore{
 		AggregateType: r.aggregateType,
@@ -76,6 +77,7 @@ func toDomain(p PocketProjection) Pocket {
 		Name:      p.Name,
 		Balance:   p.Balance,
 		UserID:    p.UserID,
+		Version:   p.Version,
 		CreatedAt: p.CreatedAt,
 		UpdatedAt: p.UpdatedAt,
 		IsDeleted: p.IsDeleted,

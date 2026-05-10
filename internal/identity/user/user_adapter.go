@@ -37,7 +37,7 @@ func NewGORMRepository(db *gorm.DB) *GORMRepository {
 	return &GORMRepository{db: db, aggregateType: "user"}
 }
 
-func (r *GORMRepository) AppendEvent(eventType string, aggregateID string, payload map[string]interface{}, metadata map[string]interface{}) error {
+func (r *GORMRepository) AppendEvent(eventType string, aggregateID string, payload any, metadata map[string]interface{}) error {
 	payloadJSON, _ := json.Marshal(payload)
 	es := database.EventStore{
 		AggregateType: r.aggregateType,

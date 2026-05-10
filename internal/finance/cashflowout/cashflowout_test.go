@@ -20,7 +20,7 @@ func newMockCashflowOutRepo() *mockCashflowOutRepo {
 	}
 }
 
-func (r *mockCashflowOutRepo) AppendEvent(eventType string, aggregateID string, payload map[string]interface{}, metadata map[string]interface{}) error {
+func (r *mockCashflowOutRepo) AppendEvent(eventType string, aggregateID string, payload any, metadata map[string]interface{}) error {
 	return nil
 }
 

@@ -18,6 +18,7 @@ type TransferProjection struct {
 	UserID       string  `gorm:"type:uuid;not null;index"`
 	Status       string  `gorm:"size:50;not null"`
 	IsDeleted    bool    `gorm:"not null;default:false"`
+	Version      int     `gorm:"not null;default:1"`
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 }
@@ -35,7 +36,7 @@ func NewGORMRepository(db *gorm.DB) *GORMRepository {
 	return &GORMRepository{db: db, aggregateType: "transfer"}
 }
 
-func (r *GORMRepository) AppendEvent(eventType string, aggregateID string, payload map[string]interface{}, metadata map[string]interface{}) error {
+func (r *GORMRepository) AppendEvent(eventType string, aggregateID string, payload any, metadata map[string]interface{}) error {
 	payloadJSON, _ := json.Marshal(payload)
 	es := database.EventStore{
 		AggregateType: r.aggregateType,
@@ -68,6 +69,7 @@ func toDomain(p TransferProjection) Transfer {
 		ToPocketID:   p.ToPocketID,
 		UserID:       p.UserID,
 		Status:       p.Status,
+		Version:      p.Version,
 		CreatedAt:    p.CreatedAt,
 		UpdatedAt:    p.UpdatedAt,
 		IsDeleted:    p.IsDeleted,

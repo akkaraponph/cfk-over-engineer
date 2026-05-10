@@ -20,7 +20,7 @@ func newMockBalanceSheetRepo() *mockBalanceSheetRepo {
 	}
 }
 
-func (r *mockBalanceSheetRepo) AppendEvent(eventType string, aggregateID string, payload map[string]interface{}, metadata map[string]interface{}) error {
+func (r *mockBalanceSheetRepo) AppendEvent(eventType string, aggregateID string, payload any, metadata map[string]interface{}) error {
 	return nil
 }
 

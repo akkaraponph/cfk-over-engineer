@@ -55,14 +55,14 @@ func (s *Service) CreateTenant(name, slug, plan string) mo.Result[Tenant] {
 		AggregateID:   id,
 		EventType:     EventCreated,
 		Version:       1,
-		Payload: map[string]interface{}{
-			"id":         id,
-			"name":       name,
-			"slug":       slug,
-			"plan":       string(tenantPlan),
-			"is_active":  true,
-			"created_at": now,
-			"updated_at": now,
+		Payload: TenantCreatedPayload{
+			ID:        id,
+			Name:      name,
+			Slug:      slug,
+			Plan:      string(tenantPlan),
+			IsActive:  true,
+			CreatedAt: now,
+			UpdatedAt: now,
 		},
 		Metadata: map[string]interface{}{
 			"timestamp": now,
@@ -108,11 +108,11 @@ func (s *Service) ChangePlan(id, plan string) mo.Result[Tenant] {
 		AggregateType: "tenant",
 		AggregateID:   id,
 		EventType:     EventPlanChanged,
-		Version:       1,
-		Payload: map[string]interface{}{
-			"id":         id,
-			"plan":       plan,
-			"updated_at": now,
+		Version:       t.Version + 1,
+		Payload: TenantPlanChangedPayload{
+			ID:        id,
+			Plan:      plan,
+			UpdatedAt: now,
 		},
 		Metadata: map[string]interface{}{
 			"timestamp": now,
@@ -130,7 +130,7 @@ func (s *Service) ChangePlan(id, plan string) mo.Result[Tenant] {
 
 func (s *Service) EnableFeature(tenantID, feature, userID string) mo.Result[TenantFeature] {
 	opt := s.repo.FindByID(tenantID)
-	_, ok := opt.Get()
+	t, ok := opt.Get()
 	if !ok {
 		return mo.Err[TenantFeature](ErrNotFound)
 	}
@@ -142,16 +142,16 @@ func (s *Service) EnableFeature(tenantID, feature, userID string) mo.Result[Tena
 		AggregateType: "tenant",
 		AggregateID:   tenantID,
 		EventType:     EventFeatureEnabled,
-		Version:       1,
-		Payload: map[string]interface{}{
-			"id":          id,
-			"tenant_id":   tenantID,
-			"feature":    feature,
-			"is_enabled":  true,
-			"enabled_by":  userID,
-			"enabled_at":  now,
-			"created_at":  now,
-			"updated_at":  now,
+		Version:       t.Version + 1,
+		Payload: TenantFeatureEnabledPayload{
+			ID:        id,
+			TenantID:  tenantID,
+			Feature:   feature,
+			IsEnabled: true,
+			EnabledBy: userID,
+			EnabledAt: now,
+			CreatedAt: now,
+			UpdatedAt: now,
 		},
 		Metadata: map[string]interface{}{
 			"timestamp": now,
@@ -175,7 +175,7 @@ func (s *Service) EnableFeature(tenantID, feature, userID string) mo.Result[Tena
 
 func (s *Service) DisableFeature(tenantID, feature, userID string) mo.Result[TenantFeature] {
 	opt := s.repo.FindByID(tenantID)
-	_, ok := opt.Get()
+	t, ok := opt.Get()
 	if !ok {
 		return mo.Err[TenantFeature](ErrNotFound)
 	}
@@ -186,14 +186,14 @@ func (s *Service) DisableFeature(tenantID, feature, userID string) mo.Result[Ten
 		AggregateType: "tenant",
 		AggregateID:   tenantID,
 		EventType:     EventFeatureDisabled,
-		Version:       1,
-		Payload: map[string]interface{}{
-			"tenant_id":   tenantID,
-			"feature":    feature,
-			"is_enabled":  false,
-			"disabled_by": userID,
-			"disabled_at": now,
-			"updated_at":  now,
+		Version:       t.Version + 1,
+		Payload: TenantFeatureDisabledPayload{
+			TenantID:   tenantID,
+			Feature:    feature,
+			IsEnabled:  false,
+			DisabledBy: userID,
+			DisabledAt: now,
+			UpdatedAt:  now,
 		},
 		Metadata: map[string]interface{}{
 			"timestamp": now,
@@ -238,11 +238,11 @@ func (s *Service) updateStatus(id string, active bool, eventType string) mo.Resu
 		AggregateType: "tenant",
 		AggregateID:   id,
 		EventType:     eventType,
-		Version:       1,
-		Payload: map[string]interface{}{
-			"id":         id,
-			"is_active":  active,
-			"updated_at": now,
+		Version:       t.Version + 1,
+		Payload: TenantActivatedPayload{
+			ID:        id,
+			IsActive:  active,
+			UpdatedAt: now,
 		},
 		Metadata: map[string]interface{}{
 			"timestamp": now,

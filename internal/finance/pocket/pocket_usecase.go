@@ -34,22 +34,20 @@ func (s *Service) CreatePocket(tenantID, name, userID string) mo.Result[Pocket] 
 	id := uuid.New().String()
 	now := time.Now()
 
-	eventPayload := map[string]interface{}{
-		"id":         id,
-		"tenant_id":  tenantID,
-		"name":       name,
-		"balance":    0.0,
-		"user_id":    userID,
-		"created_at": now,
-		"updated_at": now,
-	}
-
 	evt := event.Event{
 		AggregateType: "pocket",
 		AggregateID:   id,
 		EventType:     EventCreated,
 		Version:       1,
-		Payload:       eventPayload,
+		Payload: CreatedPayload{
+			ID:        id,
+			TenantID:  tenantID,
+			Name:      name,
+			Balance:   0.0,
+			UserID:    userID,
+			CreatedAt: now,
+			UpdatedAt: now,
+		},
 		Metadata: map[string]interface{}{
 			"timestamp": now,
 		},
@@ -83,18 +81,17 @@ func (s *Service) ChangeName(id, name string) mo.Result[Pocket] {
 	}
 
 	now := time.Now()
-	eventPayload := map[string]interface{}{
-		"id":         id,
-		"name":       name,
-		"updated_at": now,
-	}
 
 	evt := event.Event{
 		AggregateType: "pocket",
 		AggregateID:   id,
 		EventType:     EventNameChanged,
-		Version:       1,
-		Payload:       eventPayload,
+		Version:       pocket.Version + 1,
+		Payload: NameChangedPayload{
+			ID:        id,
+			Name:      name,
+			UpdatedAt: now,
+		},
 		Metadata: map[string]interface{}{
 			"timestamp": now,
 		},
@@ -119,19 +116,17 @@ func (s *Service) ChangeBalance(id string, amount float64) mo.Result[Pocket] {
 	now := time.Now()
 	newBalance := pocket.Balance + amount
 
-	eventPayload := map[string]interface{}{
-		"id":          id,
-		"amount":      amount,
-		"new_balance": newBalance,
-		"updated_at":  now,
-	}
-
 	evt := event.Event{
 		AggregateType: "pocket",
 		AggregateID:   id,
 		EventType:     EventBalanceChanged,
-		Version:       1,
-		Payload:       eventPayload,
+		Version:       pocket.Version + 1,
+		Payload: BalanceChangedPayload{
+			ID:         id,
+			Amount:     amount,
+			NewBalance: newBalance,
+			UpdatedAt:  now,
+		},
 		Metadata: map[string]interface{}{
 			"timestamp": now,
 		},
@@ -154,17 +149,16 @@ func (s *Service) DeletePocket(id string) mo.Result[Pocket] {
 	}
 
 	now := time.Now()
-	eventPayload := map[string]interface{}{
-		"id":         id,
-		"updated_at": now,
-	}
 
 	evt := event.Event{
 		AggregateType: "pocket",
 		AggregateID:   id,
 		EventType:     EventDeleted,
-		Version:       1,
-		Payload:       eventPayload,
+		Version:       pocket.Version + 1,
+		Payload: DeletedPayload{
+			ID:        id,
+			UpdatedAt: now,
+		},
 		Metadata: map[string]interface{}{
 			"timestamp": now,
 		},
