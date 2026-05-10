@@ -68,8 +68,8 @@ func (s *Service) RecordRequestLog(tenantID, userID, method, path, queryParams, 
 		},
 	}
 
-	if err := s.eventBus.Publish(evt); err != nil {
-		return mo.Err[RequestLog](err)
+	if r := s.eventBus.Publish(evt); r.IsError() {
+		return mo.Err[RequestLog](r.Error())
 	}
 
 	return mo.Ok(RequestLog{

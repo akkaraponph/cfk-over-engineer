@@ -57,8 +57,8 @@ func (s *Service) CreateCategory(tenantID, name, description, catType string, is
 		},
 	}
 
-	if err := s.eventBus.Publish(evt); err != nil {
-		return mo.Err[Category](err)
+	if r := s.eventBus.Publish(evt); r.IsError() {
+		return mo.Err[Category](r.Error())
 	}
 
 	return mo.Ok(Category{
@@ -106,8 +106,8 @@ func (s *Service) UpdateCategory(id, name, description string) mo.Result[Categor
 		},
 	}
 
-	if err := s.eventBus.Publish(evt); err != nil {
-		return mo.Err[Category](err)
+	if r := s.eventBus.Publish(evt); r.IsError() {
+		return mo.Err[Category](r.Error())
 	}
 
 	cat.Name = name
@@ -141,8 +141,8 @@ func (s *Service) DeleteCategory(id string) mo.Result[Category] {
 		},
 	}
 
-	if err := s.eventBus.Publish(evt); err != nil {
-		return mo.Err[Category](err)
+	if r := s.eventBus.Publish(evt); r.IsError() {
+		return mo.Err[Category](r.Error())
 	}
 
 	cat.IsDeleted = true

@@ -54,8 +54,8 @@ func (s *Service) CreateBalanceSheet(tenantID, userID string, year int) mo.Resul
 		},
 	}
 
-	if err := s.eventBus.Publish(evt); err != nil {
-		return mo.Err[BalanceSheet](err)
+	if r := s.eventBus.Publish(evt); r.IsError() {
+		return mo.Err[BalanceSheet](r.Error())
 	}
 
 	return mo.Ok(BalanceSheet{
@@ -98,8 +98,8 @@ func (s *Service) UpdateBalanceSheet(id string, year int) mo.Result[BalanceSheet
 		},
 	}
 
-	if err := s.eventBus.Publish(evt); err != nil {
-		return mo.Err[BalanceSheet](err)
+	if r := s.eventBus.Publish(evt); r.IsError() {
+		return mo.Err[BalanceSheet](r.Error())
 	}
 
 	bs.Year = year

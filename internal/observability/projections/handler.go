@@ -3,6 +3,7 @@ package projections
 import (
 	"cfk/pkg/event"
 
+	"github.com/samber/mo"
 	"gorm.io/gorm"
 )
 
@@ -14,7 +15,7 @@ func NewObservabilityProjectionHandler(db *gorm.DB) *ObservabilityProjectionHand
 	return &ObservabilityProjectionHandler{db: db}
 }
 
-func (h *ObservabilityProjectionHandler) HandleRequestLog(evt event.Event) error {
+func (h *ObservabilityProjectionHandler) HandleRequestLog(evt event.Event) mo.Result[struct{}] {
 	if evt.EventType == "requestlog.recorded" {
 		proj := map[string]interface{}{
 			"id":               evt.AggregateID,
@@ -34,9 +35,12 @@ func (h *ObservabilityProjectionHandler) HandleRequestLog(evt event.Event) error
 			"error_stack":      payloadStr(evt.Payload, "error_stack"),
 			"created_at":       payloadTime(evt.Payload, "created_at"),
 		}
-		return h.db.Table("request_log_projections").Create(proj).Error
+		if err := h.db.Table("request_log_projections").Create(proj).Error; err != nil {
+			return mo.Err[struct{}](err)
+		}
+		return event.OkHandle()
 	}
-	return nil
+	return event.OkHandle()
 }
 
 func payloadStr(m map[string]interface{}, key string) string {

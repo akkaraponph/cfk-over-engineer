@@ -55,8 +55,8 @@ func (s *Service) CreatePocket(tenantID, name, userID string) mo.Result[Pocket] 
 		},
 	}
 
-	if err := s.eventBus.Publish(evt); err != nil {
-		return mo.Err[Pocket](err)
+	if r := s.eventBus.Publish(evt); r.IsError() {
+		return mo.Err[Pocket](r.Error())
 	}
 
 	return mo.Ok(Pocket{
@@ -100,8 +100,8 @@ func (s *Service) ChangeName(id, name string) mo.Result[Pocket] {
 		},
 	}
 
-	if err := s.eventBus.Publish(evt); err != nil {
-		return mo.Err[Pocket](err)
+	if r := s.eventBus.Publish(evt); r.IsError() {
+		return mo.Err[Pocket](r.Error())
 	}
 
 	pocket.Name = name
@@ -137,8 +137,8 @@ func (s *Service) ChangeBalance(id string, amount float64) mo.Result[Pocket] {
 		},
 	}
 
-	if err := s.eventBus.Publish(evt); err != nil {
-		return mo.Err[Pocket](err)
+	if r := s.eventBus.Publish(evt); r.IsError() {
+		return mo.Err[Pocket](r.Error())
 	}
 
 	pocket.Balance = newBalance
@@ -170,8 +170,8 @@ func (s *Service) DeletePocket(id string) mo.Result[Pocket] {
 		},
 	}
 
-	if err := s.eventBus.Publish(evt); err != nil {
-		return mo.Err[Pocket](err)
+	if r := s.eventBus.Publish(evt); r.IsError() {
+		return mo.Err[Pocket](r.Error())
 	}
 
 	pocket.IsDeleted = true

@@ -1,9 +1,11 @@
 package sagas
 
 import (
-	"context"
 	"cfk/internal/finance/pocket"
 	"cfk/pkg/saga"
+	"context"
+
+	"github.com/samber/mo"
 )
 
 type CashflowInSagaDeps struct {
@@ -16,29 +18,29 @@ func NewCashflowInSaga(deps CashflowInSagaDeps) saga.Definition {
 		Steps: []saga.Step{
 			{
 				Name: "credit_pocket",
-				Execute: func(ctx context.Context, payload map[string]interface{}) error {
+				Execute: func(ctx context.Context, payload map[string]interface{}) mo.Result[struct{}] {
 					pocketID, _ := payload["pocket_id"].(string)
 					amount, _ := payload["amount"].(float64)
 					if pocketID == "" || amount == 0 {
-						return pocket.ErrNotFound
+						return mo.Err[struct{}](pocket.ErrNotFound)
 					}
-					result := deps.PocketService.ChangeBalance(pocketID, amount)
-					if result.IsError() {
-						return result.Error()
+					r := deps.PocketService.ChangeBalance(pocketID, amount)
+					if r.IsError() {
+						return mo.Err[struct{}](r.Error())
 					}
-					return nil
+					return saga.OkStep()
 				},
-				Compensate: func(ctx context.Context, payload map[string]interface{}) error {
+				Compensate: func(ctx context.Context, payload map[string]interface{}) mo.Result[struct{}] {
 					pocketID, _ := payload["pocket_id"].(string)
 					amount, _ := payload["amount"].(float64)
 					if pocketID == "" || amount == 0 {
-						return nil
+						return saga.OkStep()
 					}
-					result := deps.PocketService.ChangeBalance(pocketID, -amount)
-					if result.IsError() {
-						return result.Error()
+					r := deps.PocketService.ChangeBalance(pocketID, -amount)
+					if r.IsError() {
+						return mo.Err[struct{}](r.Error())
 					}
-					return nil
+					return saga.OkStep()
 				},
 			},
 		},
@@ -55,29 +57,29 @@ func NewCashflowOutSaga(deps CashflowOutSagaDeps) saga.Definition {
 		Steps: []saga.Step{
 			{
 				Name: "debit_pocket",
-				Execute: func(ctx context.Context, payload map[string]interface{}) error {
+				Execute: func(ctx context.Context, payload map[string]interface{}) mo.Result[struct{}] {
 					pocketID, _ := payload["pocket_id"].(string)
 					amount, _ := payload["amount"].(float64)
 					if pocketID == "" || amount == 0 {
-						return pocket.ErrNotFound
+						return mo.Err[struct{}](pocket.ErrNotFound)
 					}
-					result := deps.PocketService.ChangeBalance(pocketID, -amount)
-					if result.IsError() {
-						return result.Error()
+					r := deps.PocketService.ChangeBalance(pocketID, -amount)
+					if r.IsError() {
+						return mo.Err[struct{}](r.Error())
 					}
-					return nil
+					return saga.OkStep()
 				},
-				Compensate: func(ctx context.Context, payload map[string]interface{}) error {
+				Compensate: func(ctx context.Context, payload map[string]interface{}) mo.Result[struct{}] {
 					pocketID, _ := payload["pocket_id"].(string)
 					amount, _ := payload["amount"].(float64)
 					if pocketID == "" || amount == 0 {
-						return nil
+						return saga.OkStep()
 					}
-					result := deps.PocketService.ChangeBalance(pocketID, amount)
-					if result.IsError() {
-						return result.Error()
+					r := deps.PocketService.ChangeBalance(pocketID, amount)
+					if r.IsError() {
+						return mo.Err[struct{}](r.Error())
 					}
-					return nil
+					return saga.OkStep()
 				},
 			},
 		},

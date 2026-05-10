@@ -1,10 +1,12 @@
 package sagas
 
 import (
-	"context"
 	"cfk/internal/finance/pocket"
 	"cfk/internal/finance/transfer"
 	"cfk/pkg/saga"
+	"context"
+
+	"github.com/samber/mo"
 )
 
 type TransferSagaDeps struct {
@@ -18,81 +20,81 @@ func NewTransferSaga(deps TransferSagaDeps) saga.Definition {
 		Steps: []saga.Step{
 			{
 				Name: "debit_source",
-				Execute: func(ctx context.Context, payload map[string]interface{}) error {
+				Execute: func(ctx context.Context, payload map[string]interface{}) mo.Result[struct{}] {
 					fromPocketID, _ := payload["from_pocket_id"].(string)
 					amount, _ := payload["amount"].(float64)
 					if fromPocketID == "" || amount == 0 {
-						return pocket.ErrNotFound
+						return mo.Err[struct{}](pocket.ErrNotFound)
 					}
-					result := deps.PocketService.ChangeBalance(fromPocketID, -amount)
-					if result.IsError() {
-						return result.Error()
+					r := deps.PocketService.ChangeBalance(fromPocketID, -amount)
+					if r.IsError() {
+						return mo.Err[struct{}](r.Error())
 					}
-					return nil
+					return saga.OkStep()
 				},
-				Compensate: func(ctx context.Context, payload map[string]interface{}) error {
+				Compensate: func(ctx context.Context, payload map[string]interface{}) mo.Result[struct{}] {
 					fromPocketID, _ := payload["from_pocket_id"].(string)
 					amount, _ := payload["amount"].(float64)
 					if fromPocketID == "" || amount == 0 {
-						return nil
+						return saga.OkStep()
 					}
-					result := deps.PocketService.ChangeBalance(fromPocketID, amount)
-					if result.IsError() {
-						return result.Error()
+					r := deps.PocketService.ChangeBalance(fromPocketID, amount)
+					if r.IsError() {
+						return mo.Err[struct{}](r.Error())
 					}
-					return nil
+					return saga.OkStep()
 				},
 			},
 			{
 				Name: "credit_destination",
-				Execute: func(ctx context.Context, payload map[string]interface{}) error {
+				Execute: func(ctx context.Context, payload map[string]interface{}) mo.Result[struct{}] {
 					toPocketID, _ := payload["to_pocket_id"].(string)
 					amount, _ := payload["amount"].(float64)
 					if toPocketID == "" || amount == 0 {
-						return pocket.ErrNotFound
+						return mo.Err[struct{}](pocket.ErrNotFound)
 					}
-					result := deps.PocketService.ChangeBalance(toPocketID, amount)
-					if result.IsError() {
-						return result.Error()
+					r := deps.PocketService.ChangeBalance(toPocketID, amount)
+					if r.IsError() {
+						return mo.Err[struct{}](r.Error())
 					}
-					return nil
+					return saga.OkStep()
 				},
-				Compensate: func(ctx context.Context, payload map[string]interface{}) error {
+				Compensate: func(ctx context.Context, payload map[string]interface{}) mo.Result[struct{}] {
 					toPocketID, _ := payload["to_pocket_id"].(string)
 					amount, _ := payload["amount"].(float64)
 					if toPocketID == "" || amount == 0 {
-						return nil
+						return saga.OkStep()
 					}
-					result := deps.PocketService.ChangeBalance(toPocketID, -amount)
-					if result.IsError() {
-						return result.Error()
+					r := deps.PocketService.ChangeBalance(toPocketID, -amount)
+					if r.IsError() {
+						return mo.Err[struct{}](r.Error())
 					}
-					return nil
+					return saga.OkStep()
 				},
 			},
 			{
 				Name: "complete_transfer",
-				Execute: func(ctx context.Context, payload map[string]interface{}) error {
+				Execute: func(ctx context.Context, payload map[string]interface{}) mo.Result[struct{}] {
 					transferID, _ := payload["transfer_id"].(string)
 					if transferID == "" {
-						return transfer.ErrNotFound
+						return mo.Err[struct{}](transfer.ErrNotFound)
 					}
-					result := deps.TransferService.CompleteTransfer(transferID)
-					if result.IsError() {
-						return result.Error()
+					r := deps.TransferService.CompleteTransfer(transferID)
+					if r.IsError() {
+						return mo.Err[struct{}](r.Error())
 					}
-					return nil
+					return saga.OkStep()
 				},
-				Compensate: func(ctx context.Context, payload map[string]interface{}) error {
+				Compensate: func(ctx context.Context, payload map[string]interface{}) mo.Result[struct{}] {
 					transferID, _ := payload["transfer_id"].(string)
 					if transferID == "" {
-						return nil
+						return saga.OkStep()
 					}
-					result := deps.TransferService.FailTransfer(transferID, "saga compensation")
-					if result.IsError() {
-						return result.Error()
+					r := deps.TransferService.FailTransfer(transferID, "saga compensation")
+					if r.IsError() {
+						return mo.Err[struct{}](r.Error())
 					}
-					return nil
+					return saga.OkStep()
 				},
 			},
 		},

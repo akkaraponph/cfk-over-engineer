@@ -3,6 +3,7 @@ package projections
 import (
 	"cfk/pkg/event"
 
+	"github.com/samber/mo"
 	"gorm.io/gorm"
 )
 
@@ -14,7 +15,7 @@ func NewFinanceProjectionHandler(db *gorm.DB) *FinanceProjectionHandler {
 	return &FinanceProjectionHandler{db: db}
 }
 
-func (h *FinanceProjectionHandler) HandlePocket(evt event.Event) error {
+func (h *FinanceProjectionHandler) HandlePocket(evt event.Event) mo.Result[struct{}] {
 	switch evt.EventType {
 	case "pocket.created":
 		proj := map[string]interface{}{
@@ -27,33 +28,45 @@ func (h *FinanceProjectionHandler) HandlePocket(evt event.Event) error {
 			"created_at": payloadTime(evt.Payload, "created_at"),
 			"updated_at": payloadTime(evt.Payload, "updated_at"),
 		}
-		return h.db.Table("pocket_projections").Create(proj).Error
+		if err := h.db.Table("pocket_projections").Create(proj).Error; err != nil {
+			return mo.Err[struct{}](err)
+		}
+		return event.OkHandle()
 	case "pocket.name_changed":
-		return h.db.Table("pocket_projections").
+		if err := h.db.Table("pocket_projections").
 			Where("id = ?", evt.AggregateID).
 			Updates(map[string]interface{}{
 				"name":       payloadStr(evt.Payload, "name"),
 				"updated_at": payloadTime(evt.Payload, "updated_at"),
-			}).Error
+			}).Error; err != nil {
+			return mo.Err[struct{}](err)
+		}
+		return event.OkHandle()
 	case "pocket.balance_changed":
-		return h.db.Table("pocket_projections").
+		if err := h.db.Table("pocket_projections").
 			Where("id = ?", evt.AggregateID).
 			Updates(map[string]interface{}{
 				"balance":    payloadFloat(evt.Payload, "new_balance"),
 				"updated_at": payloadTime(evt.Payload, "updated_at"),
-			}).Error
+			}).Error; err != nil {
+			return mo.Err[struct{}](err)
+		}
+		return event.OkHandle()
 	case "pocket.deleted":
-		return h.db.Table("pocket_projections").
+		if err := h.db.Table("pocket_projections").
 			Where("id = ?", evt.AggregateID).
 			Updates(map[string]interface{}{
 				"is_deleted": true,
 				"updated_at": payloadTime(evt.Payload, "updated_at"),
-			}).Error
+			}).Error; err != nil {
+			return mo.Err[struct{}](err)
+		}
+		return event.OkHandle()
 	}
-	return nil
+	return event.OkHandle()
 }
 
-func (h *FinanceProjectionHandler) HandleCashflowIn(evt event.Event) error {
+func (h *FinanceProjectionHandler) HandleCashflowIn(evt event.Event) mo.Result[struct{}] {
 	switch evt.EventType {
 	case "cashflowin.recorded":
 		proj := map[string]interface{}{
@@ -69,29 +82,38 @@ func (h *FinanceProjectionHandler) HandleCashflowIn(evt event.Event) error {
 			"created_at":  payloadTime(evt.Payload, "created_at"),
 			"updated_at":  payloadTime(evt.Payload, "updated_at"),
 		}
-		return h.db.Table("cashflowin_projections").Create(proj).Error
+		if err := h.db.Table("cashflowin_projections").Create(proj).Error; err != nil {
+			return mo.Err[struct{}](err)
+		}
+		return event.OkHandle()
 	case "cashflowin.updated":
-		return h.db.Table("cashflowin_projections").
+		if err := h.db.Table("cashflowin_projections").
 			Where("id = ?", evt.AggregateID).
 			Updates(map[string]interface{}{
-				"amount":      payloadFloat(evt.Payload, "amount"),
-				"description": payloadStr(evt.Payload, "description"),
+				"amount":       payloadFloat(evt.Payload, "amount"),
+				"description":  payloadStr(evt.Payload, "description"),
 				"category_id": payloadInt(evt.Payload, "category_id"),
 				"receipt":     payloadStr(evt.Payload, "receipt"),
 				"updated_at":  payloadTime(evt.Payload, "updated_at"),
-			}).Error
+			}).Error; err != nil {
+			return mo.Err[struct{}](err)
+		}
+		return event.OkHandle()
 	case "cashflowin.deleted":
-		return h.db.Table("cashflowin_projections").
+		if err := h.db.Table("cashflowin_projections").
 			Where("id = ?", evt.AggregateID).
 			Updates(map[string]interface{}{
 				"is_deleted": true,
 				"updated_at": payloadTime(evt.Payload, "updated_at"),
-			}).Error
+			}).Error; err != nil {
+			return mo.Err[struct{}](err)
+		}
+		return event.OkHandle()
 	}
-	return nil
+	return event.OkHandle()
 }
 
-func (h *FinanceProjectionHandler) HandleCashflowOut(evt event.Event) error {
+func (h *FinanceProjectionHandler) HandleCashflowOut(evt event.Event) mo.Result[struct{}] {
 	switch evt.EventType {
 	case "cashflowout.recorded":
 		proj := map[string]interface{}{
@@ -108,29 +130,38 @@ func (h *FinanceProjectionHandler) HandleCashflowOut(evt event.Event) error {
 			"created_at":  payloadTime(evt.Payload, "created_at"),
 			"updated_at":  payloadTime(evt.Payload, "updated_at"),
 		}
-		return h.db.Table("cashflowout_projections").Create(proj).Error
+		if err := h.db.Table("cashflowout_projections").Create(proj).Error; err != nil {
+			return mo.Err[struct{}](err)
+		}
+		return event.OkHandle()
 	case "cashflowout.updated":
-		return h.db.Table("cashflowout_projections").
+		if err := h.db.Table("cashflowout_projections").
 			Where("id = ?", evt.AggregateID).
 			Updates(map[string]interface{}{
-				"amount":      payloadFloat(evt.Payload, "amount"),
-				"description": payloadStr(evt.Payload, "description"),
+				"amount":       payloadFloat(evt.Payload, "amount"),
+				"description":  payloadStr(evt.Payload, "description"),
 				"category_id": payloadInt(evt.Payload, "category_id"),
 				"receipt":     payloadStr(evt.Payload, "receipt"),
 				"updated_at":  payloadTime(evt.Payload, "updated_at"),
-			}).Error
+			}).Error; err != nil {
+			return mo.Err[struct{}](err)
+		}
+		return event.OkHandle()
 	case "cashflowout.deleted":
-		return h.db.Table("cashflowout_projections").
+		if err := h.db.Table("cashflowout_projections").
 			Where("id = ?", evt.AggregateID).
 			Updates(map[string]interface{}{
 				"is_deleted": true,
 				"updated_at": payloadTime(evt.Payload, "updated_at"),
-			}).Error
+			}).Error; err != nil {
+			return mo.Err[struct{}](err)
+		}
+		return event.OkHandle()
 	}
-	return nil
+	return event.OkHandle()
 }
 
-func (h *FinanceProjectionHandler) HandleTransfer(evt event.Event) error {
+func (h *FinanceProjectionHandler) HandleTransfer(evt event.Event) mo.Result[struct{}] {
 	switch evt.EventType {
 	case "transfer.initiated":
 		proj := map[string]interface{}{
@@ -145,26 +176,35 @@ func (h *FinanceProjectionHandler) HandleTransfer(evt event.Event) error {
 			"created_at":     payloadTime(evt.Payload, "created_at"),
 			"updated_at":     payloadTime(evt.Payload, "updated_at"),
 		}
-		return h.db.Table("transfer_projections").Create(proj).Error
+		if err := h.db.Table("transfer_projections").Create(proj).Error; err != nil {
+			return mo.Err[struct{}](err)
+		}
+		return event.OkHandle()
 	case "transfer.completed", "transfer.failed":
-		return h.db.Table("transfer_projections").
+		if err := h.db.Table("transfer_projections").
 			Where("id = ?", evt.AggregateID).
 			Updates(map[string]interface{}{
 				"status":     payloadStr(evt.Payload, "status"),
 				"updated_at": payloadTime(evt.Payload, "updated_at"),
-			}).Error
+			}).Error; err != nil {
+			return mo.Err[struct{}](err)
+		}
+		return event.OkHandle()
 	case "transfer.deleted":
-		return h.db.Table("transfer_projections").
+		if err := h.db.Table("transfer_projections").
 			Where("id = ?", evt.AggregateID).
 			Updates(map[string]interface{}{
 				"is_deleted": true,
 				"updated_at": payloadTime(evt.Payload, "updated_at"),
-			}).Error
+			}).Error; err != nil {
+			return mo.Err[struct{}](err)
+		}
+		return event.OkHandle()
 	}
-	return nil
+	return event.OkHandle()
 }
 
-func (h *FinanceProjectionHandler) HandleCategory(evt event.Event) error {
+func (h *FinanceProjectionHandler) HandleCategory(evt event.Event) mo.Result[struct{}] {
 	switch evt.EventType {
 	case "category.created":
 		proj := map[string]interface{}{
@@ -179,24 +219,33 @@ func (h *FinanceProjectionHandler) HandleCategory(evt event.Event) error {
 			"created_at":  payloadTime(evt.Payload, "created_at"),
 			"updated_at":  payloadTime(evt.Payload, "updated_at"),
 		}
-		return h.db.Table("category_projections").Create(proj).Error
+		if err := h.db.Table("category_projections").Create(proj).Error; err != nil {
+			return mo.Err[struct{}](err)
+		}
+		return event.OkHandle()
 	case "category.updated":
-		return h.db.Table("category_projections").
+		if err := h.db.Table("category_projections").
 			Where("id = ?", evt.AggregateID).
 			Updates(map[string]interface{}{
 				"name":        payloadStr(evt.Payload, "name"),
 				"description": payloadStr(evt.Payload, "description"),
 				"updated_at":  payloadTime(evt.Payload, "updated_at"),
-			}).Error
+			}).Error; err != nil {
+			return mo.Err[struct{}](err)
+		}
+		return event.OkHandle()
 	case "category.deleted":
-		return h.db.Table("category_projections").
+		if err := h.db.Table("category_projections").
 			Where("id = ?", evt.AggregateID).
 			Updates(map[string]interface{}{
 				"is_deleted": true,
 				"updated_at": payloadTime(evt.Payload, "updated_at"),
-			}).Error
+			}).Error; err != nil {
+			return mo.Err[struct{}](err)
+		}
+		return event.OkHandle()
 	}
-	return nil
+	return event.OkHandle()
 }
 
 func payloadStr(m map[string]interface{}, key string) string {

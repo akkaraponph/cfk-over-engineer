@@ -69,8 +69,8 @@ func (s *Service) InitiateTransfer(tenantID, userID, fromPocketID, toPocketID st
 		},
 	}
 
-	if err := s.eventBus.Publish(evt); err != nil {
-		return mo.Err[Transfer](err)
+	if r := s.eventBus.Publish(evt); r.IsError() {
+		return mo.Err[Transfer](r.Error())
 	}
 
 	if s.sagaOrchestrator != nil {
@@ -126,8 +126,8 @@ func (s *Service) CompleteTransfer(id string) mo.Result[Transfer] {
 		},
 	}
 
-	if err := s.eventBus.Publish(evt); err != nil {
-		return mo.Err[Transfer](err)
+	if r := s.eventBus.Publish(evt); r.IsError() {
+		return mo.Err[Transfer](r.Error())
 	}
 
 	t.Status = "completed"
@@ -165,8 +165,8 @@ func (s *Service) FailTransfer(id string, reason string) mo.Result[Transfer] {
 		},
 	}
 
-	if err := s.eventBus.Publish(evt); err != nil {
-		return mo.Err[Transfer](err)
+	if r := s.eventBus.Publish(evt); r.IsError() {
+		return mo.Err[Transfer](r.Error())
 	}
 
 	t.Status = "failed"
@@ -198,8 +198,8 @@ func (s *Service) DeleteTransfer(id string) mo.Result[Transfer] {
 		},
 	}
 
-	if err := s.eventBus.Publish(evt); err != nil {
-		return mo.Err[Transfer](err)
+	if r := s.eventBus.Publish(evt); r.IsError() {
+		return mo.Err[Transfer](r.Error())
 	}
 
 	t.IsDeleted = true

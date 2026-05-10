@@ -4,6 +4,8 @@ import (
 	"context"
 	"sync"
 	"time"
+
+	"github.com/samber/mo"
 )
 
 type Event struct {
@@ -15,7 +17,7 @@ type Event struct {
 	Metadata      map[string]interface{}
 }
 
-type Handler func(Event) error
+type Handler func(Event) mo.Result[struct{}]
 
 type FailedEvent struct {
 	Event   Event
@@ -24,9 +26,9 @@ type FailedEvent struct {
 }
 
 type Bus struct {
-	handlers   map[string][]Handler
-	ch         chan Event
-	deadLetter chan FailedEvent
+	handlers    map[string][]Handler
+	ch          chan Event
+	deadLetter  chan FailedEvent
 	workerCount int
 	bufferSize  int
 	maxRetries  int
@@ -34,6 +36,10 @@ type Bus struct {
 	wg          sync.WaitGroup
 	cancel      context.CancelFunc
 	mu          sync.RWMutex
+}
+
+func OkHandle() mo.Result[struct{}] {
+	return mo.Ok[struct{}](struct{}{})
 }
 
 func NewBus(opts ...Option) *Bus {
@@ -59,9 +65,9 @@ func (b *Bus) Subscribe(eventType string, handler Handler) {
 	b.handlers[eventType] = append(b.handlers[eventType], handler)
 }
 
-func (b *Bus) Publish(evt Event) error {
+func (b *Bus) Publish(evt Event) mo.Result[struct{}] {
 	b.ch <- evt
-	return nil
+	return OkHandle()
 }
 
 func (b *Bus) Start(ctx context.Context) {
@@ -118,8 +124,8 @@ func (b *Bus) executeWithRetry(evt Event, handler Handler) {
 		if attempt > 0 {
 			time.Sleep(b.backoff(attempt))
 		}
-		if err := handler(evt); err != nil {
-			lastErr = err
+		if r := handler(evt); r.IsError() {
+			lastErr = r.Error()
 			continue
 		}
 		return

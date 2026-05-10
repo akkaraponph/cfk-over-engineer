@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/samber/mo"
 	"gorm.io/gorm"
 )
 
@@ -30,46 +31,56 @@ func NewGORMStore(db *gorm.DB) *GORMStore {
 	return &GORMStore{db: db}
 }
 
-func (s *GORMStore) Save(instance *Instance) error {
+func (s *GORMStore) Save(instance *Instance) mo.Result[struct{}] {
 	proj := toProjection(instance)
-	return s.db.Create(&proj).Error
+	if err := s.db.Create(&proj).Error; err != nil {
+		return mo.Err[struct{}](err)
+	}
+	return OkStep()
 }
 
-func (s *GORMStore) FindByID(id string) (*Instance, error) {
+func (s *GORMStore) FindByID(id string) mo.Option[*Instance] {
 	var proj SagaInstanceProjection
 	if err := s.db.Where("id = ?", id).First(&proj).Error; err != nil {
-		return nil, err
+		return mo.None[*Instance]()
 	}
-	return toInstance(proj)
+	inst, err := toInstance(proj)
+	if err != nil {
+		return mo.None[*Instance]()
+	}
+	return mo.Some(inst)
 }
 
-func (s *GORMStore) FindByState(state InstanceState) ([]*Instance, error) {
+func (s *GORMStore) FindByState(state InstanceState) mo.Result[[]*Instance] {
 	var projs []SagaInstanceProjection
 	if err := s.db.Where("state = ?", string(state)).Find(&projs).Error; err != nil {
-		return nil, err
+		return mo.Err[[]*Instance](err)
 	}
 	result := make([]*Instance, 0, len(projs))
 	for _, proj := range projs {
 		inst, err := toInstance(proj)
 		if err != nil {
-			return nil, err
+			return mo.Err[[]*Instance](err)
 		}
 		result = append(result, inst)
 	}
-	return result, nil
+	return mo.Ok(result)
 }
 
-func (s *GORMStore) Update(instance *Instance) error {
-	proj := toProjection(instance)
+func (s *GORMStore) Update(instance *Instance) mo.Result[struct{}] {
 	instance.UpdatedAt = time.Now()
+	proj := toProjection(instance)
 	proj.UpdatedAt = instance.UpdatedAt
-	return s.db.Where("id = ?", instance.ID).Updates(map[string]interface{}{
+	if err := s.db.Where("id = ?", instance.ID).Updates(map[string]interface{}{
 		"state":        proj.State,
 		"current_step": proj.CurrentStep,
 		"payload":      proj.Payload,
 		"error":        proj.Error,
 		"updated_at":   proj.UpdatedAt,
-	}).Error
+	}).Error; err != nil {
+		return mo.Err[struct{}](err)
+	}
+	return OkStep()
 }
 
 func toProjection(inst *Instance) SagaInstanceProjection {

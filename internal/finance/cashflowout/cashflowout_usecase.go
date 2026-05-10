@@ -70,8 +70,8 @@ func (s *Service) RecordCashflowOut(tenantID, userID, pocketID string, categoryI
 		},
 	}
 
-	if err := s.eventBus.Publish(evt); err != nil {
-		return mo.Err[CashflowOut](err)
+	if r := s.eventBus.Publish(evt); r.IsError() {
+		return mo.Err[CashflowOut](r.Error())
 	}
 
 	if s.sagaOrchestrator != nil {
@@ -131,8 +131,8 @@ func (s *Service) UpdateCashflowOut(id string, amount float64, description strin
 		},
 	}
 
-	if err := s.eventBus.Publish(evt); err != nil {
-		return mo.Err[CashflowOut](err)
+	if r := s.eventBus.Publish(evt); r.IsError() {
+		return mo.Err[CashflowOut](r.Error())
 	}
 
 	cf.Amount = amount
@@ -167,8 +167,8 @@ func (s *Service) DeleteCashflowOut(id string) mo.Result[CashflowOut] {
 		},
 	}
 
-	if err := s.eventBus.Publish(evt); err != nil {
-		return mo.Err[CashflowOut](err)
+	if r := s.eventBus.Publish(evt); r.IsError() {
+		return mo.Err[CashflowOut](r.Error())
 	}
 
 	cf.IsDeleted = true

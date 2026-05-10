@@ -64,8 +64,8 @@ func (s *Service) RecordDebt(tenantID, debtType, description, userID string, amo
 		},
 	}
 
-	if err := s.eventBus.Publish(evt); err != nil {
-		return mo.Err[Debt](err)
+	if r := s.eventBus.Publish(evt); r.IsError() {
+		return mo.Err[Debt](r.Error())
 	}
 
 	return mo.Ok(Debt{
@@ -114,8 +114,8 @@ func (s *Service) ChangeAmount(id string, amount float64) mo.Result[Debt] {
 		},
 	}
 
-	if err := s.eventBus.Publish(evt); err != nil {
-		return mo.Err[Debt](err)
+	if r := s.eventBus.Publish(evt); r.IsError() {
+		return mo.Err[Debt](r.Error())
 	}
 
 	debt.Amount = amount
@@ -149,8 +149,8 @@ func (s *Service) AssignToBalanceSheet(id, balanceSheetID string) mo.Result[Debt
 		},
 	}
 
-	if err := s.eventBus.Publish(evt); err != nil {
-		return mo.Err[Debt](err)
+	if r := s.eventBus.Publish(evt); r.IsError() {
+		return mo.Err[Debt](r.Error())
 	}
 
 	debt.BalanceSheetID = balanceSheetID
@@ -183,8 +183,8 @@ func (s *Service) UnassignFromBalanceSheet(id string) mo.Result[Debt] {
 		},
 	}
 
-	if err := s.eventBus.Publish(evt); err != nil {
-		return mo.Err[Debt](err)
+	if r := s.eventBus.Publish(evt); r.IsError() {
+		return mo.Err[Debt](r.Error())
 	}
 
 	debt.BalanceSheetID = ""

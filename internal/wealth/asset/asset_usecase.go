@@ -62,8 +62,8 @@ func (s *Service) RecordAsset(tenantID, assetType, description, userID string, v
 		},
 	}
 
-	if err := s.eventBus.Publish(evt); err != nil {
-		return mo.Err[Asset](err)
+	if r := s.eventBus.Publish(evt); r.IsError() {
+		return mo.Err[Asset](r.Error())
 	}
 
 	return mo.Ok(Asset{
@@ -111,8 +111,8 @@ func (s *Service) ChangeValue(id string, value, cashflowPerYear float64) mo.Resu
 		},
 	}
 
-	if err := s.eventBus.Publish(evt); err != nil {
-		return mo.Err[Asset](err)
+	if r := s.eventBus.Publish(evt); r.IsError() {
+		return mo.Err[Asset](r.Error())
 	}
 
 	asset.Value = value
@@ -147,8 +147,8 @@ func (s *Service) AssignToBalanceSheet(id, balanceSheetID string) mo.Result[Asse
 		},
 	}
 
-	if err := s.eventBus.Publish(evt); err != nil {
-		return mo.Err[Asset](err)
+	if r := s.eventBus.Publish(evt); r.IsError() {
+		return mo.Err[Asset](r.Error())
 	}
 
 	asset.BalanceSheetID = balanceSheetID
@@ -181,8 +181,8 @@ func (s *Service) UnassignFromBalanceSheet(id string) mo.Result[Asset] {
 		},
 	}
 
-	if err := s.eventBus.Publish(evt); err != nil {
-		return mo.Err[Asset](err)
+	if r := s.eventBus.Publish(evt); r.IsError() {
+		return mo.Err[Asset](r.Error())
 	}
 
 	asset.BalanceSheetID = ""

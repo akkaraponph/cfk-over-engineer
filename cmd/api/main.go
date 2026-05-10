@@ -12,6 +12,7 @@ import (
 	"cfk/internal/identity/tenant"
 	"cfk/internal/identity/user"
 	obsprojections "cfk/internal/observability/projections"
+	"cfk/internal/observability/requestlog"
 	wealthprojections "cfk/internal/wealth/projections"
 	"cfk/internal/wealth/asset"
 	"cfk/internal/wealth/balancesheet"
@@ -33,7 +34,19 @@ func main() {
 		log.Fatal(err)
 	}
 
-	if err := database.AutoMigrate(db); err != nil {
+	if err := database.AutoMigrate(db,
+		&tenant.TenantProjection{},
+		&user.UserProjection{},
+		&pocket.PocketProjection{},
+		&cashflowin.CashflowInProjection{},
+		&cashflowout.CashflowOutProjection{},
+		&transfer.TransferProjection{},
+		&category.CategoryProjection{},
+		&asset.AssetProjection{},
+		&debt.DebtProjection{},
+		&balancesheet.BalanceSheetProjection{},
+		&requestlog.RequestLogProjection{},
+	); err != nil {
 		log.Fatal(err)
 	}
 
@@ -53,6 +66,9 @@ func main() {
 	eventBus.Subscribe("tenant.created", identityProjHandler.HandleTenant)
 	eventBus.Subscribe("tenant.activated", identityProjHandler.HandleTenant)
 	eventBus.Subscribe("tenant.deactivated", identityProjHandler.HandleTenant)
+	eventBus.Subscribe("tenant.plan_changed", identityProjHandler.HandleTenant)
+	eventBus.Subscribe("tenant.feature_enabled", identityProjHandler.HandleTenantFeature)
+	eventBus.Subscribe("tenant.feature_disabled", identityProjHandler.HandleTenantFeature)
 	eventBus.Subscribe("user.registered", identityProjHandler.HandleUser)
 	eventBus.Subscribe("user.activated", identityProjHandler.HandleUser)
 	eventBus.Subscribe("user.deactivated", identityProjHandler.HandleUser)
@@ -153,8 +169,8 @@ func main() {
 
 	eventBus.Start(ctx)
 
-	if err := sagaOrchestrator.Recover(ctx); err != nil {
-		log.Printf("saga recovery warning: %v", err)
+	if r := sagaOrchestrator.Recover(ctx); r.IsError() {
+		log.Printf("saga recovery warning: %v", r.Error())
 	}
 
 	go func() {
@@ -172,50 +188,60 @@ func main() {
 	tenants := api.Group("/tenants")
 	tenants.Post("/", tenantHandler.CreateTenant)
 	tenants.Get("/:slug", tenantHandler.GetTenantBySlug)
+	tenants.Put("/:id/plan", tenantHandler.ChangePlan)
+	tenants.Post("/:id/activate", tenantHandler.ActivateTenant)
+	tenants.Post("/:id/deactivate", tenantHandler.DeactivateTenant)
+	tenants.Post("/:id/features", tenantHandler.EnableFeature)
+	tenants.Delete("/:id/features", tenantHandler.DisableFeature)
+	tenants.Get("/:id/features", tenantHandler.CheckFeature)
 
-	users := api.Group("/users")
+	tenantGroup := api.Group("/", middleware.TenantMiddleware(tenantService))
+
+	users := tenantGroup.Group("/users")
 	users.Post("/", userHandler.RegisterUser)
 	users.Get("/email/:email", userHandler.GetUserByEmail)
 
-	pockets := api.Group("/pockets")
+	pockets := tenantGroup.Group("/pockets")
 	pockets.Post("/", pocketHandler.CreatePocket)
 	pockets.Get("/:id", pocketHandler.GetPocketByID)
 	pockets.Get("/user/:userId", pocketHandler.ListPocketsByUser)
 
-	cashflowins := api.Group("/cashflowins")
+	cashflowins := tenantGroup.Group("/cashflowins")
 	cashflowins.Post("/", cashflowinHandler.RecordCashflowIn)
 	cashflowins.Get("/:id", cashflowinHandler.GetCashflowInByID)
 	cashflowins.Get("/pocket/:pocketId", cashflowinHandler.ListCashflowInsByPocket)
 
-	cashflowouts := api.Group("/cashflowouts")
+	cashflowouts := tenantGroup.Group("/cashflowouts")
 	cashflowouts.Post("/", cashflowoutHandler.RecordCashflowOut)
 	cashflowouts.Get("/:id", cashflowoutHandler.GetCashflowOutByID)
 	cashflowouts.Get("/pocket/:pocketId", cashflowoutHandler.ListCashflowOutsByPocket)
 
-	transfers := api.Group("/transfers")
+	transfers := tenantGroup.Group("/transfers", middleware.FeatureGuard(tenantService, "transfer"))
 	transfers.Post("/", transferHandler.InitiateTransfer)
 	transfers.Get("/:id", transferHandler.GetTransferByID)
 
-	categories := api.Group("/categories")
+	categories := tenantGroup.Group("/categories")
 	categories.Post("/", categoryHandler.CreateCategory)
 	categories.Get("/:id", categoryHandler.GetCategoryByID)
 	categories.Get("/", categoryHandler.ListCategoriesByTenant)
 
-	assets := api.Group("/assets")
+	wealthGroup := tenantGroup.Group("/", middleware.FeatureGuard(tenantService, "balance_sheet"))
+
+	assets := wealthGroup.Group("/assets")
 	assets.Post("/", assetHandler.RecordAsset)
 	assets.Get("/:id", assetHandler.GetAssetByID)
 	assets.Put("/:id/value", assetHandler.ChangeValue)
 	assets.Post("/:id/balancesheet", assetHandler.AssignToBalanceSheet)
 	assets.Delete("/:id/balancesheet", assetHandler.UnassignFromBalanceSheet)
 
-	debts := api.Group("/debts")
+	debts := wealthGroup.Group("/debts")
 	debts.Post("/", debtHandler.RecordDebt)
 	debts.Get("/:id", debtHandler.GetDebtByID)
 	debts.Put("/:id/amount", debtHandler.ChangeAmount)
 	debts.Post("/:id/balancesheet", debtHandler.AssignToBalanceSheet)
 	debts.Delete("/:id/balancesheet", debtHandler.UnassignFromBalanceSheet)
 
-	balancesheets := api.Group("/balancesheets")
+	balancesheets := wealthGroup.Group("/balancesheets")
 	balancesheets.Post("/", balancesheetHandler.CreateBalanceSheet)
 	balancesheets.Get("/:id", balancesheetHandler.GetBalanceSheetByID)
 	balancesheets.Put("/:id", balancesheetHandler.UpdateBalanceSheet)

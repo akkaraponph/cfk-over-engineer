@@ -5,6 +5,7 @@ import (
 	"cfk/pkg/event"
 	"encoding/json"
 
+	"github.com/samber/mo"
 	"gorm.io/gorm"
 )
 
@@ -16,7 +17,7 @@ func NewProjectionHandler(db *gorm.DB) *ProjectionHandler {
 	return &ProjectionHandler{db: db}
 }
 
-func (h *ProjectionHandler) Handle(evt event.Event) error {
+func (h *ProjectionHandler) Handle(evt event.Event) mo.Result[struct{}] {
 	eventStore := database.EventStore{
 		AggregateType: evt.AggregateType,
 		AggregateID:   evt.AggregateID,
@@ -32,5 +33,8 @@ func (h *ProjectionHandler) Handle(evt event.Event) error {
 		eventStore.Metadata = string(metadataJSON)
 	}
 
-	return h.db.Create(&eventStore).Error
+	if err := h.db.Create(&eventStore).Error; err != nil {
+		return mo.Err[struct{}](err)
+	}
+	return event.OkHandle()
 }

@@ -89,8 +89,8 @@ func (s *Service) RegisterUser(tenantID, username, email, password, firstName, l
 		},
 	}
 
-	if err := s.eventBus.Publish(evt); err != nil {
-		return mo.Err[User](err)
+	if r := s.eventBus.Publish(evt); r.IsError() {
+		return mo.Err[User](r.Error())
 	}
 
 	return mo.Ok(User{
@@ -146,8 +146,8 @@ func (s *Service) ChangeRole(id, role string) mo.Result[User] {
 		},
 	}
 
-	if err := s.eventBus.Publish(evt); err != nil {
-		return mo.Err[User](err)
+	if r := s.eventBus.Publish(evt); r.IsError() {
+		return mo.Err[User](r.Error())
 	}
 
 	user.Role = role
@@ -182,8 +182,8 @@ func (s *Service) UpdateProfile(id, firstName, lastName, phone string) mo.Result
 		},
 	}
 
-	if err := s.eventBus.Publish(evt); err != nil {
-		return mo.Err[User](err)
+	if r := s.eventBus.Publish(evt); r.IsError() {
+		return mo.Err[User](r.Error())
 	}
 
 	user.FirstName = firstName
@@ -227,8 +227,8 @@ func (s *Service) updateUserStatus(id string, isActive bool, eventType string) m
 		},
 	}
 
-	if err := s.eventBus.Publish(evt); err != nil {
-		return mo.Err[User](err)
+	if r := s.eventBus.Publish(evt); r.IsError() {
+		return mo.Err[User](r.Error())
 	}
 
 	user.IsActive = isActive

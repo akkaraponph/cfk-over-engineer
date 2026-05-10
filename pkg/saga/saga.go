@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/samber/mo"
 )
 
 type InstanceState string
@@ -19,8 +20,8 @@ const (
 
 type Step struct {
 	Name       string
-	Execute    func(ctx context.Context, payload map[string]interface{}) error
-	Compensate func(ctx context.Context, payload map[string]interface{}) error
+	Execute    func(ctx context.Context, payload map[string]interface{}) mo.Result[struct{}]
+	Compensate func(ctx context.Context, payload map[string]interface{}) mo.Result[struct{}]
 }
 
 type Definition struct {
@@ -49,4 +50,8 @@ func NewInstance(sagaName string, payload map[string]interface{}) *Instance {
 		CreatedAt: now,
 		UpdatedAt: now,
 	}
+}
+
+func OkStep() mo.Result[struct{}] {
+	return mo.Ok[struct{}](struct{}{})
 }

@@ -3,6 +3,7 @@ package projections
 import (
 	"cfk/pkg/event"
 
+	"github.com/samber/mo"
 	"gorm.io/gorm"
 )
 
@@ -14,7 +15,7 @@ func NewWealthProjectionHandler(db *gorm.DB) *WealthProjectionHandler {
 	return &WealthProjectionHandler{db: db}
 }
 
-func (h *WealthProjectionHandler) HandleAsset(evt event.Event) error {
+func (h *WealthProjectionHandler) HandleAsset(evt event.Event) mo.Result[struct{}] {
 	switch evt.EventType {
 	case "asset.recorded":
 		proj := map[string]interface{}{
@@ -29,34 +30,46 @@ func (h *WealthProjectionHandler) HandleAsset(evt event.Event) error {
 			"created_at":        payloadTime(evt.Payload, "created_at"),
 			"updated_at":        payloadTime(evt.Payload, "updated_at"),
 		}
-		return h.db.Table("asset_projections").Create(proj).Error
+		if err := h.db.Table("asset_projections").Create(proj).Error; err != nil {
+			return mo.Err[struct{}](err)
+		}
+		return event.OkHandle()
 	case "asset.value_changed":
-		return h.db.Table("asset_projections").
+		if err := h.db.Table("asset_projections").
 			Where("id = ?", evt.AggregateID).
 			Updates(map[string]interface{}{
 				"value":             payloadFloat(evt.Payload, "value"),
 				"cashflow_per_year": payloadFloat(evt.Payload, "cashflow_per_year"),
 				"updated_at":        payloadTime(evt.Payload, "updated_at"),
-			}).Error
+			}).Error; err != nil {
+			return mo.Err[struct{}](err)
+		}
+		return event.OkHandle()
 	case "asset.assigned_to_balancesheet":
-		return h.db.Table("asset_projections").
+		if err := h.db.Table("asset_projections").
 			Where("id = ?", evt.AggregateID).
 			Updates(map[string]interface{}{
 				"balance_sheet_id": payloadStr(evt.Payload, "balance_sheet_id"),
 				"updated_at":       payloadTime(evt.Payload, "updated_at"),
-			}).Error
+			}).Error; err != nil {
+			return mo.Err[struct{}](err)
+		}
+		return event.OkHandle()
 	case "asset.unassigned_from_balancesheet":
-		return h.db.Table("asset_projections").
+		if err := h.db.Table("asset_projections").
 			Where("id = ?", evt.AggregateID).
 			Updates(map[string]interface{}{
 				"balance_sheet_id": "",
 				"updated_at":       payloadTime(evt.Payload, "updated_at"),
-			}).Error
+			}).Error; err != nil {
+			return mo.Err[struct{}](err)
+		}
+		return event.OkHandle()
 	}
-	return nil
+	return event.OkHandle()
 }
 
-func (h *WealthProjectionHandler) HandleDebt(evt event.Event) error {
+func (h *WealthProjectionHandler) HandleDebt(evt event.Event) mo.Result[struct{}] {
 	switch evt.EventType {
 	case "debt.recorded":
 		proj := map[string]interface{}{
@@ -73,33 +86,45 @@ func (h *WealthProjectionHandler) HandleDebt(evt event.Event) error {
 			"created_at":       payloadTime(evt.Payload, "created_at"),
 			"updated_at":       payloadTime(evt.Payload, "updated_at"),
 		}
-		return h.db.Table("debt_projections").Create(proj).Error
+		if err := h.db.Table("debt_projections").Create(proj).Error; err != nil {
+			return mo.Err[struct{}](err)
+		}
+		return event.OkHandle()
 	case "debt.amount_changed":
-		return h.db.Table("debt_projections").
+		if err := h.db.Table("debt_projections").
 			Where("id = ?", evt.AggregateID).
 			Updates(map[string]interface{}{
 				"amount":     payloadFloat(evt.Payload, "amount"),
 				"updated_at": payloadTime(evt.Payload, "updated_at"),
-			}).Error
+			}).Error; err != nil {
+			return mo.Err[struct{}](err)
+		}
+		return event.OkHandle()
 	case "debt.assigned_to_balancesheet":
-		return h.db.Table("debt_projections").
+		if err := h.db.Table("debt_projections").
 			Where("id = ?", evt.AggregateID).
 			Updates(map[string]interface{}{
 				"balance_sheet_id": payloadStr(evt.Payload, "balance_sheet_id"),
 				"updated_at":       payloadTime(evt.Payload, "updated_at"),
-			}).Error
+			}).Error; err != nil {
+			return mo.Err[struct{}](err)
+		}
+		return event.OkHandle()
 	case "debt.unassigned_from_balancesheet":
-		return h.db.Table("debt_projections").
+		if err := h.db.Table("debt_projections").
 			Where("id = ?", evt.AggregateID).
 			Updates(map[string]interface{}{
 				"balance_sheet_id": "",
 				"updated_at":       payloadTime(evt.Payload, "updated_at"),
-			}).Error
+			}).Error; err != nil {
+			return mo.Err[struct{}](err)
+		}
+		return event.OkHandle()
 	}
-	return nil
+	return event.OkHandle()
 }
 
-func (h *WealthProjectionHandler) HandleBalanceSheet(evt event.Event) error {
+func (h *WealthProjectionHandler) HandleBalanceSheet(evt event.Event) mo.Result[struct{}] {
 	switch evt.EventType {
 	case "balancesheet.created":
 		proj := map[string]interface{}{
@@ -110,16 +135,22 @@ func (h *WealthProjectionHandler) HandleBalanceSheet(evt event.Event) error {
 			"created_at": payloadTime(evt.Payload, "created_at"),
 			"updated_at": payloadTime(evt.Payload, "updated_at"),
 		}
-		return h.db.Table("balancesheet_projections").Create(proj).Error
+		if err := h.db.Table("balancesheet_projections").Create(proj).Error; err != nil {
+			return mo.Err[struct{}](err)
+		}
+		return event.OkHandle()
 	case "balancesheet.updated":
-		return h.db.Table("balancesheet_projections").
+		if err := h.db.Table("balancesheet_projections").
 			Where("id = ?", evt.AggregateID).
 			Updates(map[string]interface{}{
 				"year":       payloadInt(evt.Payload, "year"),
 				"updated_at": payloadTime(evt.Payload, "updated_at"),
-			}).Error
+			}).Error; err != nil {
+			return mo.Err[struct{}](err)
+		}
+		return event.OkHandle()
 	}
-	return nil
+	return event.OkHandle()
 }
 
 func payloadStr(m map[string]interface{}, key string) string {
