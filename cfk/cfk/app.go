@@ -26,6 +26,7 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 	"gorm.io/gorm"
+	"gorm.io/plugin/opentelemetry/tracing"
 )
 
 type App struct {
@@ -70,6 +71,10 @@ func NewApp(cfg Config) (*App, error) {
 		&balancesheet.BalanceSheetProjection{},
 		&requestlog.RequestLogProjection{},
 	); err != nil {
+		return nil, err
+	}
+
+	if err := db.Use(tracing.NewPlugin()); err != nil {
 		return nil, err
 	}
 
@@ -128,6 +133,7 @@ func NewApp(cfg Config) (*App, error) {
 	}()
 
 	app := fiber.New()
+	app.Use(middleware.TraceMiddleware())
 	app.Use(middleware.RequestLoggerMiddleware())
 
 	RegisterRoutes(app, RoutesDeps{

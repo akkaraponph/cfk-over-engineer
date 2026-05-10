@@ -1,0 +1,25 @@
+stream_over_http_enabled: true
+server:
+  http_listen_port: 3200
+  log_level: info
+
+distributor:
+  receivers:
+    otlp:
+      protocols:
+        http:
+        grpc:
+
+ingester:
+  max_block_duration: 5m               # cut the headblock every 5 minutes
+
+storage:
+  trace:
+    backend: local                     # backend configuration to store traces
+    local:
+      path: /var/tempo/traces
+    wal:
+      path: /var/tempo/wal             # where to store the the write-ahead log locally
+
+overrides:
+  metrics_generator_processors: [service-graphs, span-metrics] # enables metrics generator
