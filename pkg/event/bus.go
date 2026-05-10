@@ -1,6 +1,10 @@
 package event
 
-import "fmt"
+import (
+	"context"
+	"sync"
+	"time"
+)
 
 type Event struct {
 	AggregateType string
@@ -13,34 +17,115 @@ type Event struct {
 
 type Handler func(Event) error
 
-type Bus struct {
-	handlers map[string][]Handler
+type FailedEvent struct {
+	Event   Event
+	Handler Handler
+	Err     error
 }
 
-func NewBus() *Bus {
-	return &Bus{
-		handlers: make(map[string][]Handler),
+type Bus struct {
+	handlers   map[string][]Handler
+	ch         chan Event
+	deadLetter chan FailedEvent
+	workerCount int
+	bufferSize  int
+	maxRetries  int
+	backoff     func(attempt int) time.Duration
+	wg          sync.WaitGroup
+	cancel      context.CancelFunc
+	mu          sync.RWMutex
+}
+
+func NewBus(opts ...Option) *Bus {
+	b := &Bus{
+		handlers:    make(map[string][]Handler),
+		ch:          make(chan Event, 1024),
+		deadLetter:  make(chan FailedEvent, 256),
+		workerCount: 4,
+		bufferSize:  1024,
+		maxRetries:  3,
+		backoff:     defaultBackoff,
 	}
+	for _, opt := range opts {
+		opt(b)
+	}
+	b.ch = make(chan Event, b.bufferSize)
+	return b
 }
 
 func (b *Bus) Subscribe(eventType string, handler Handler) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
 	b.handlers[eventType] = append(b.handlers[eventType], handler)
 }
 
-func (b *Bus) Publish(event Event) error {
-	if handlers, ok := b.handlers[event.EventType]; ok {
-		for _, handler := range handlers {
-			if err := handler(event); err != nil {
-				return fmt.Errorf("event handler failed for %s: %w", event.EventType, err)
-			}
-		}
-	}
-	if wildcardHandlers, ok := b.handlers["*"]; ok {
-		for _, handler := range wildcardHandlers {
-			if err := handler(event); err != nil {
-				return fmt.Errorf("wildcard handler failed for %s: %w", event.EventType, err)
-			}
-		}
-	}
+func (b *Bus) Publish(evt Event) error {
+	b.ch <- evt
 	return nil
+}
+
+func (b *Bus) Start(ctx context.Context) {
+	ctx, b.cancel = context.WithCancel(ctx)
+	for i := 0; i < b.workerCount; i++ {
+		b.wg.Add(1)
+		go b.worker(ctx)
+	}
+}
+
+func (b *Bus) Stop() {
+	if b.cancel != nil {
+		b.cancel()
+	}
+	close(b.ch)
+	b.wg.Wait()
+	close(b.deadLetter)
+}
+
+func (b *Bus) DeadLetters() <-chan FailedEvent {
+	return b.deadLetter
+}
+
+func (b *Bus) worker(ctx context.Context) {
+	defer b.wg.Done()
+	for evt := range b.ch {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+		b.dispatch(ctx, evt)
+	}
+}
+
+func (b *Bus) dispatch(_ context.Context, evt Event) {
+	b.mu.RLock()
+	handlers := b.handlers[evt.EventType]
+	wildcardHandlers := b.handlers["*"]
+	b.mu.RUnlock()
+
+	allHandlers := make([]Handler, 0, len(handlers)+len(wildcardHandlers))
+	allHandlers = append(allHandlers, handlers...)
+	allHandlers = append(allHandlers, wildcardHandlers...)
+
+	for _, handler := range allHandlers {
+		b.executeWithRetry(evt, handler)
+	}
+}
+
+func (b *Bus) executeWithRetry(evt Event, handler Handler) {
+	var lastErr error
+	for attempt := 0; attempt <= b.maxRetries; attempt++ {
+		if attempt > 0 {
+			time.Sleep(b.backoff(attempt))
+		}
+		if err := handler(evt); err != nil {
+			lastErr = err
+			continue
+		}
+		return
+	}
+	select {
+	case b.deadLetter <- FailedEvent{Event: evt, Handler: handler, Err: lastErr}:
+	default:
+	}
 }

@@ -1,6 +1,7 @@
 package database
 
 import (
+	"cfk/pkg/saga"
 	"time"
 
 	"gorm.io/gorm"
@@ -22,7 +23,7 @@ func (EventStore) TableName() string {
 }
 
 func AutoMigrate(db *gorm.DB, models ...interface{}) error {
-	allModels := []interface{}{&EventStore{}}
+	allModels := []interface{}{&EventStore{}, &saga.SagaInstanceProjection{}}
 	allModels = append(allModels, models...)
 	return db.AutoMigrate(allModels...)
 }

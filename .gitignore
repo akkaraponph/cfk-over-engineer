@@ -27,3 +27,6 @@ go.work.sum
 .idea/
 .vscode/
 *.swp
+
+# Grafana runtime data (keep provisioning configs)
+grafana/data/

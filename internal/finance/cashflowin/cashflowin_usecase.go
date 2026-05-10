@@ -2,6 +2,8 @@ package cashflowin
 
 import (
 	"cfk/pkg/event"
+	"cfk/pkg/saga"
+	"context"
 	"errors"
 	"time"
 
@@ -15,8 +17,9 @@ var (
 )
 
 type Service struct {
-	repo     Repository
-	eventBus *event.Bus
+	repo             Repository
+	eventBus         *event.Bus
+	sagaOrchestrator *saga.Orchestrator
 }
 
 func NewService(repo Repository, eventBus *event.Bus) *Service {
@@ -24,6 +27,10 @@ func NewService(repo Repository, eventBus *event.Bus) *Service {
 		repo:     repo,
 		eventBus: eventBus,
 	}
+}
+
+func (s *Service) SetSagaOrchestrator(orchestrator *saga.Orchestrator) {
+	s.sagaOrchestrator = orchestrator
 }
 
 func (s *Service) RecordCashflowIn(tenantID, userID, pocketID string, categoryID int, amount float64, description, receipt string) mo.Result[CashflowIn] {
@@ -60,6 +67,15 @@ func (s *Service) RecordCashflowIn(tenantID, userID, pocketID string, categoryID
 
 	if err := s.eventBus.Publish(evt); err != nil {
 		return mo.Err[CashflowIn](err)
+	}
+
+	if s.sagaOrchestrator != nil {
+		sagaPayload := map[string]interface{}{
+			"cashflowin_id": id,
+			"pocket_id":     pocketID,
+			"amount":        amount,
+		}
+		go s.sagaOrchestrator.Execute(context.Background(), "cashflowin", sagaPayload)
 	}
 
 	return mo.Ok(CashflowIn{

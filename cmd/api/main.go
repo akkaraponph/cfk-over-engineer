@@ -1,20 +1,27 @@
 package main
 
 import (
-	"cfk/internal/asset"
-	"cfk/internal/balancesheet"
-	"cfk/internal/cashflowin"
-	"cfk/internal/cashflowout"
-	"cfk/internal/category"
-	"cfk/internal/debt"
-	"cfk/internal/pocket"
-	"cfk/internal/tenant"
-	"cfk/internal/transfer"
-	"cfk/internal/user"
+	"cfk/internal/finance/cashflowin"
+	"cfk/internal/finance/cashflowout"
+	"cfk/internal/finance/category"
+	"cfk/internal/finance/pocket"
+	financeprojections "cfk/internal/finance/projections"
+	"cfk/internal/finance/sagas"
+	"cfk/internal/finance/transfer"
+	identityprojections "cfk/internal/identity/projections"
+	"cfk/internal/identity/tenant"
+	"cfk/internal/identity/user"
+	obsprojections "cfk/internal/observability/projections"
+	wealthprojections "cfk/internal/wealth/projections"
+	"cfk/internal/wealth/asset"
+	"cfk/internal/wealth/balancesheet"
+	"cfk/internal/wealth/debt"
 	"cfk/pkg/database"
 	"cfk/pkg/event"
 	"cfk/pkg/handlers"
 	"cfk/pkg/middleware"
+	"cfk/pkg/saga"
+	"context"
 	"log"
 
 	"github.com/gofiber/fiber/v3"
@@ -30,10 +37,64 @@ func main() {
 		log.Fatal(err)
 	}
 
-	eventBus := event.NewBus()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	eventBus := event.NewBus(
+		event.WithWorkerPool(4),
+		event.WithBufferSize(1024),
+		event.WithMaxRetries(3),
+	)
 
 	projectionHandler := handlers.NewProjectionHandler(db)
 	eventBus.Subscribe("*", projectionHandler.Handle)
+
+	identityProjHandler := identityprojections.NewIdentityProjectionHandler(db)
+	eventBus.Subscribe("tenant.created", identityProjHandler.HandleTenant)
+	eventBus.Subscribe("tenant.activated", identityProjHandler.HandleTenant)
+	eventBus.Subscribe("tenant.deactivated", identityProjHandler.HandleTenant)
+	eventBus.Subscribe("user.registered", identityProjHandler.HandleUser)
+	eventBus.Subscribe("user.activated", identityProjHandler.HandleUser)
+	eventBus.Subscribe("user.deactivated", identityProjHandler.HandleUser)
+	eventBus.Subscribe("user.role_changed", identityProjHandler.HandleUser)
+	eventBus.Subscribe("user.profile_updated", identityProjHandler.HandleUser)
+
+	financeProjHandler := financeprojections.NewFinanceProjectionHandler(db)
+	eventBus.Subscribe("pocket.created", financeProjHandler.HandlePocket)
+	eventBus.Subscribe("pocket.name_changed", financeProjHandler.HandlePocket)
+	eventBus.Subscribe("pocket.balance_changed", financeProjHandler.HandlePocket)
+	eventBus.Subscribe("pocket.deleted", financeProjHandler.HandlePocket)
+	eventBus.Subscribe("cashflowin.recorded", financeProjHandler.HandleCashflowIn)
+	eventBus.Subscribe("cashflowin.updated", financeProjHandler.HandleCashflowIn)
+	eventBus.Subscribe("cashflowin.deleted", financeProjHandler.HandleCashflowIn)
+	eventBus.Subscribe("cashflowout.recorded", financeProjHandler.HandleCashflowOut)
+	eventBus.Subscribe("cashflowout.updated", financeProjHandler.HandleCashflowOut)
+	eventBus.Subscribe("cashflowout.deleted", financeProjHandler.HandleCashflowOut)
+	eventBus.Subscribe("transfer.initiated", financeProjHandler.HandleTransfer)
+	eventBus.Subscribe("transfer.completed", financeProjHandler.HandleTransfer)
+	eventBus.Subscribe("transfer.failed", financeProjHandler.HandleTransfer)
+	eventBus.Subscribe("transfer.deleted", financeProjHandler.HandleTransfer)
+	eventBus.Subscribe("category.created", financeProjHandler.HandleCategory)
+	eventBus.Subscribe("category.updated", financeProjHandler.HandleCategory)
+	eventBus.Subscribe("category.deleted", financeProjHandler.HandleCategory)
+
+	wealthProjHandler := wealthprojections.NewWealthProjectionHandler(db)
+	eventBus.Subscribe("asset.recorded", wealthProjHandler.HandleAsset)
+	eventBus.Subscribe("asset.value_changed", wealthProjHandler.HandleAsset)
+	eventBus.Subscribe("asset.assigned_to_balancesheet", wealthProjHandler.HandleAsset)
+	eventBus.Subscribe("asset.unassigned_from_balancesheet", wealthProjHandler.HandleAsset)
+	eventBus.Subscribe("debt.recorded", wealthProjHandler.HandleDebt)
+	eventBus.Subscribe("debt.amount_changed", wealthProjHandler.HandleDebt)
+	eventBus.Subscribe("debt.assigned_to_balancesheet", wealthProjHandler.HandleDebt)
+	eventBus.Subscribe("debt.unassigned_from_balancesheet", wealthProjHandler.HandleDebt)
+	eventBus.Subscribe("balancesheet.created", wealthProjHandler.HandleBalanceSheet)
+	eventBus.Subscribe("balancesheet.updated", wealthProjHandler.HandleBalanceSheet)
+
+	obsProjHandler := obsprojections.NewObservabilityProjectionHandler(db)
+	eventBus.Subscribe("requestlog.recorded", obsProjHandler.HandleRequestLog)
+
+	sagaStore := saga.NewGORMStore(db)
+	sagaOrchestrator := saga.NewOrchestrator(sagaStore)
 
 	tenantRepo := tenant.NewGORMRepository(db)
 	tenantService := tenant.NewService(tenantRepo, eventBus)
@@ -74,6 +135,33 @@ func main() {
 	balancesheetRepo := balancesheet.NewGORMRepository(db)
 	balancesheetService := balancesheet.NewService(balancesheetRepo, eventBus)
 	balancesheetHandler := balancesheet.NewHandler(balancesheetService)
+
+	sagaOrchestrator.Register(sagas.NewTransferSaga(sagas.TransferSagaDeps{
+		TransferService: transferService,
+		PocketService:   pocketService,
+	}))
+	sagaOrchestrator.Register(sagas.NewCashflowInSaga(sagas.CashflowInSagaDeps{
+		PocketService: pocketService,
+	}))
+	sagaOrchestrator.Register(sagas.NewCashflowOutSaga(sagas.CashflowOutSagaDeps{
+		PocketService: pocketService,
+	}))
+
+	transferService.SetSagaOrchestrator(sagaOrchestrator)
+	cashflowinService.SetSagaOrchestrator(sagaOrchestrator)
+	cashflowoutService.SetSagaOrchestrator(sagaOrchestrator)
+
+	eventBus.Start(ctx)
+
+	if err := sagaOrchestrator.Recover(ctx); err != nil {
+		log.Printf("saga recovery warning: %v", err)
+	}
+
+	go func() {
+		for failed := range eventBus.DeadLetters() {
+			log.Printf("dead letter event: type=%s err=%v", failed.Event.EventType, failed.Err)
+		}
+	}()
 
 	app := fiber.New()
 

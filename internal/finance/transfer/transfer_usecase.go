@@ -2,6 +2,8 @@ package transfer
 
 import (
 	"cfk/pkg/event"
+	"cfk/pkg/saga"
+	"context"
 	"errors"
 	"time"
 
@@ -17,8 +19,9 @@ var (
 )
 
 type Service struct {
-	repo     Repository
-	eventBus *event.Bus
+	repo              Repository
+	eventBus          *event.Bus
+	sagaOrchestrator  *saga.Orchestrator
 }
 
 func NewService(repo Repository, eventBus *event.Bus) *Service {
@@ -26,6 +29,10 @@ func NewService(repo Repository, eventBus *event.Bus) *Service {
 		repo:     repo,
 		eventBus: eventBus,
 	}
+}
+
+func (s *Service) SetSagaOrchestrator(orchestrator *saga.Orchestrator) {
+	s.sagaOrchestrator = orchestrator
 }
 
 func (s *Service) InitiateTransfer(tenantID, userID, fromPocketID, toPocketID string, amount float64) mo.Result[Transfer] {
@@ -64,6 +71,16 @@ func (s *Service) InitiateTransfer(tenantID, userID, fromPocketID, toPocketID st
 
 	if err := s.eventBus.Publish(evt); err != nil {
 		return mo.Err[Transfer](err)
+	}
+
+	if s.sagaOrchestrator != nil {
+		sagaPayload := map[string]interface{}{
+			"transfer_id":    id,
+			"from_pocket_id": fromPocketID,
+			"to_pocket_id":   toPocketID,
+			"amount":         amount,
+		}
+		go s.sagaOrchestrator.Execute(context.Background(), "transfer", sagaPayload)
 	}
 
 	return mo.Ok(Transfer{
@@ -165,7 +182,6 @@ func (s *Service) DeleteTransfer(id string) mo.Result[Transfer] {
 	}
 
 	now := time.Now()
-
 	eventPayload := map[string]interface{}{
 		"id":         id,
 		"updated_at": now,
