@@ -1,54 +1,16 @@
-package main
+package cfk
 
 import (
-	"cfk/internal/finance/projections"
+	financeprojections "cfk/internal/finance/projections"
 	identityprojections "cfk/internal/identity/projections"
 	obsprojections "cfk/internal/observability/projections"
 	wealthprojections "cfk/internal/wealth/projections"
-	"cfk/pkg/database"
 	"cfk/pkg/event"
-	"context"
-	"log"
-	"time"
 
 	"gorm.io/gorm"
 )
 
-func main() {
-	db, err := database.NewPostgresDB()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	if err := database.TruncateProjections(db); err != nil {
-		log.Fatalf("truncate projections: %v", err)
-	}
-	log.Println("truncated all projection tables")
-
-	bus := event.NewBus(event.WithWorkerPool(1), event.WithBufferSize(1024))
-	registerProjectionHandlers(bus, db)
-
-	ctx := context.Background()
-	bus.Start(ctx)
-	defer bus.Stop()
-
-	count := 0
-	err = database.ReplayEvents(db, func(evt event.Event) error {
-		bus.Publish(evt)
-		count++
-		return nil
-	})
-
-	time.Sleep(500 * time.Millisecond)
-
-	if err != nil {
-		log.Fatalf("replay failed: %v", err)
-	}
-
-	log.Printf("replay complete: %d events replayed", count)
-}
-
-func registerProjectionHandlers(bus *event.Bus, db *gorm.DB) {
+func SubscribeProjectionHandlers(bus *event.Bus, db *gorm.DB) {
 	identityProjHandler := identityprojections.NewIdentityProjectionHandler(db)
 	bus.Subscribe("tenant.created", identityProjHandler.HandleTenant)
 	bus.Subscribe("tenant.activated", identityProjHandler.HandleTenant)
@@ -62,7 +24,7 @@ func registerProjectionHandlers(bus *event.Bus, db *gorm.DB) {
 	bus.Subscribe("user.role_changed", identityProjHandler.HandleUser)
 	bus.Subscribe("user.profile_updated", identityProjHandler.HandleUser)
 
-	financeProjHandler := projections.NewFinanceProjectionHandler(db)
+	financeProjHandler := financeprojections.NewFinanceProjectionHandler(db)
 	bus.Subscribe("pocket.created", financeProjHandler.HandlePocket)
 	bus.Subscribe("pocket.name_changed", financeProjHandler.HandlePocket)
 	bus.Subscribe("pocket.balance_changed", financeProjHandler.HandlePocket)
