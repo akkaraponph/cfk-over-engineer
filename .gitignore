@@ -1,0 +1,29 @@
+# Binaries and compiled files
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin/
+
+# Test artifacts
+*.test
+*.out
+*.coverprofile
+profile.cov
+
+# Dependency directories
+# Only ignore if you are NOT using Go modules vendor mode
+# vendor/
+
+# Go workspace file
+go.work
+go.work.sum
+
+# Environment variables
+.env
+
+# IDE / Editor Specific
+.idea/
+.vscode/
+*.swp
