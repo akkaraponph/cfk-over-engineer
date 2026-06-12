@@ -168,7 +168,8 @@ Transfer Saga:
 cfk/
 ├── cmd/
 │   ├── api/main.go              — API server entry point
-│   └── seed/main.go             — Demo data seeder
+│   ├── seed/main.go             — Demo data seeder
+│   └── replay/main.go           — Projection rebuild (truncate + replay event store)
 ├── internal/
 │   ├── identity/
 │   │   ├── tenant/              — Tenant domain (plan, features, SaaS)
@@ -193,14 +194,20 @@ cfk/
 ├── pkg/
 │   ├── event/                   — Async event bus (goroutine worker pool)
 │   ├── saga/                    — Saga engine (orchestrator, store, state machine)
-│   ├── database/                — GORM setup, AutoMigrate, event store model
+│   ├── database/                — GORM setup, AutoMigrate, event store, replay
 │   ├── handlers/                — Event store write handler
-│   └── middleware/              — TenantResolver, FeatureGuard, Auth, RequestLogger
-├── grafana/                     — Grafana + Loki provisioning
+│   ├── auth/                    — JWT issuing & verification
+│   ├── telemetry/               — OpenTelemetry tracer provider
+│   └── middleware/              — TenantResolver, FeatureGuard, Auth, RequestLogger, Trace
+├── cfk/                         — App assembly (NewApp, route + projection wiring)
+├── grafana/                     — Grafana provisioning (Loki + Tempo datasources, dashboards)
 ├── docs/
-│   ├── plan.md
+│   ├── plan/plan.md
 │   └── db.md
-├── compose.yml
+├── compose.yml                  — Postgres, Loki, Tempo, OTel Collector, Grafana
+├── tempo.yaml                   — Tempo config
+├── otel-collector-config.yaml   — OTel Collector pipeline (OTLP → Tempo)
+├── .env-sample                  — Configuration template
 ├── go.mod
 └── README.md
 ```
@@ -213,14 +220,16 @@ cfk/
 | HTTP Framework | Fiber v3 |
 | ORM | GORM + PostgreSQL |
 | Functional Types | samber/mo (Result, Option) |
-| Observability | Grafana + Loki |
+| Tracing | OpenTelemetry → OTel Collector → Grafana Tempo |
+| Logs | Grafana Loki |
+| Dashboards | Grafana |
 | Containerization | Docker Compose |
 
 ## Getting Started
 
 ### Prerequisites
 
-- Go 1.22+
+- Go 1.26+
 - Docker & Docker Compose
 - PostgreSQL (or use compose)
 
@@ -232,7 +241,9 @@ docker compose up -d
 
 This starts:
 - PostgreSQL on `:5432`
-- Loki on `:3100`
+- Loki on `:3100` (logs)
+- Tempo on `:3200` (trace storage / query API)
+- OTel Collector on `:4317` (OTLP gRPC) / `:4318` (OTLP HTTP) — forwards traces to Tempo
 - Grafana on `:3001` (admin/admin)
 
 ### Run API Server
@@ -241,8 +252,20 @@ This starts:
 # Set database URL
 export DATABASE_URL="host=localhost port=5432 user=postgres password=postgres dbname=cfk sslmode=disable TimeZone=UTC"
 
+# (Optional) point traces at the collector — defaults to localhost:4317 if unset
+export OTEL_EXPORTER_OTLP_ENDPOINT="localhost:4317"
+
 # Run with auto-migration
 go run ./cmd/api
+```
+
+See `.env-sample` for the full set of configuration variables.
+
+### Rebuild Projections (Replay)
+
+```bash
+# Truncate all projection tables and replay the event store to rebuild read models
+go run ./cmd/replay
 ```
 
 ### Seed Demo Data
@@ -261,7 +284,7 @@ go test -v ./internal/finance/transfer/  # specific domain
 go test -count=1 ./...          # no cache
 ```
 
-104 tests across 12 packages covering domain validation, use case orchestration, event publishing, saga compensation, and bus worker pool behavior.
+166 tests across 27 packages covering domain validation, use case orchestration, event publishing, saga compensation, JWT auth, and bus worker pool behavior.
 
 ## API Endpoints
 
@@ -328,4 +351,4 @@ Unwrapping: `result, err := service.Method(args).Get()`
 7. **Fire-and-forget publishing** — async event bus, errors go to dead letter channel
 8. **Projection rebuild** — can replay all events to rebuild any projection table
 9. **Boundary isolation** — no direct imports between identity, finance, wealth
-10. **TDD** — 104 tests, domain validation before orchestration, mock repos + async event recording
+10. **TDD** — 166 tests, domain validation before orchestration, mock repos + async event recording

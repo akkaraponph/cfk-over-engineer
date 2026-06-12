@@ -55,10 +55,11 @@ services:
     volumes:
       - ./tempo.yaml:/etc/tempo.yaml
       - tempo_data:/var/tempo
+    # OTLP (4317/4318) is reached internally as tempo:4317 by the otel-collector;
+    # it is intentionally NOT published to the host to avoid clashing with the
+    # collector, which owns the host-side OTLP ports below.
     ports:
-      - "3200:3200"   # tempo
-      - "4317:4317"   # otlp grpc
-      - "4318:4318"   # otlp http
+      - "3200:3200"   # tempo query API (Grafana datasource)
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:3200/ready || exit 1"]
       interval: 10s
